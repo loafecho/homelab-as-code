@@ -1,0 +1,24 @@
+# Ansible staging renders (reviewed, never auto-applied)
+ansible/build/
+*.retry
+
+# OpenTofu working files. State is encrypted, but plaintext copies and real
+# variable files must never land in git.
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+*.tfvars
+!*.tfvars.example
+opentofu/keys/*.age
+opentofu/keys/*identity*
+opentofu/keys/recipients.txt
+opentofu/*.log
+
+# Local environment
+.env
+.env.*
+!.env.example
+__pycache__/
+.ansible/
