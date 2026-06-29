@@ -1,0 +1,43 @@
+---
+# proxmox_firewall — render <vmid>.fw + cluster.fw to the staging dir.
+# Templating only; no live host needed. Runs once, on localhost.
+
+- name: Ensure firewall staging dir exists
+  ansible.builtin.file:
+    path: "{{ firewall_build_dir }}"
+    state: directory
+    mode: "0755"
+  delegate_to: localhost
+  run_once: true
+
+- name: Render per-guest <vmid>.fw to staging (skips null-vmid guests)
+  ansible.builtin.template:
+    src: guest.fw.j2
+    dest: "{{ firewall_build_dir }}/{{ guests[item].vmid }}.fw"
+    mode: "0644"
+  vars:
+    fw_guest: "{{ item }}"
+  loop: "{{ guests.keys() | list }}"
+  loop_control:
+    label: "{{ item }} -> {{ guests[item].vmid | default('SKIP(no-vmid)') }}.fw"
+  when: guests[item].vmid not in [None, omit]
+  delegate_to: localhost
+  run_once: true
+
+- name: Render datacenter cluster.fw to staging (hypervisor:8006 admin allow)
+  ansible.builtin.template:
+    src: cluster.fw.j2
+    dest: "{{ firewall_build_dir }}/cluster.fw"
+    mode: "0644"
+  delegate_to: localhost
+  run_once: true
+
+- name: Report staging location
+  ansible.builtin.debug:
+    msg: >-
+      Rendered firewall rules to {{ firewall_build_dir }} (review only).
+      firewall_apply={{ firewall_apply }} — nothing written to {{ firewall_live_dir }}.
+  run_once: true
+
+# TODO: when firewall_apply is true, copy build/firewall/*.fw to
+# {{ firewall_live_dir }} on the Proxmox host (snapshot-first) and reload pve-firewall.

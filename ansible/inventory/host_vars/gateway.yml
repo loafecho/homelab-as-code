@@ -1,0 +1,16 @@
+---
+# gateway (DMZ reverse proxy) - NOT BUILT YET. vmid: null, no reserved IP.
+# The single public front door once provisioned. ALL gateway rules ship
+# enabled:false until it exists; the firewall role skips any guest whose vmid
+# is null, so nothing renders yet.
+zone: dmz
+firewall:
+  policy_in: DROP
+  policy_out: ACCEPT
+  always_allow_established: true
+  ingress:
+    - { src: ref:admin_devices, port: 22, proto: tcp, enabled: false, comment: "T1 break-glass SSH. ENABLE when built" }
+    - { src: control, port: 22, proto: tcp, enabled: false, comment: "Ansible control. ENABLE when built" }
+    - { src: internet, port: 443, proto: tcp, enabled: false, comment: "public HTTPS. ENABLE when built" }
+  egress: []
+  # CUT (the point of the design): gateway must NEVER reach vault.

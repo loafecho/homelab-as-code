@@ -1,0 +1,30 @@
+---
+# vault (VM 101) - Infisical secrets SINK. Initiates nothing.
+zone: secrets
+firewall:
+  policy_in: DROP
+  policy_out: DROP                     # vault NEVER initiates outbound
+  always_allow_established: true
+  ingress:
+    - { src: ref:admin_devices, port: 22, proto: tcp, enabled: true, comment: "T1 break-glass SSH" }
+    - { src: control, port: 22, proto: tcp, enabled: true, comment: "Ansible control" }
+    - { src: "group:secret_consumers", port: 443, proto: tcp, enabled: true,
+        comment: "secret fetch via the Caddy TLS front (roles/vault_caddy_tls)" }
+    - { src: monitor, port: 443, proto: tcp, enabled: true, comment: "uptime probe" }
+  # policy_out stays DROP. ONE narrow carve-out: tbot (Teleport Machine ID,
+  # roles/vault_caddy_tls) runs on vault and must dial OUT to Teleport to join
+  # and renew the Caddy TLS leaf cert. always_allow_established only covers
+  # return traffic, not a new outbound session, so this rule is required.
+  egress:
+    - { dest: teleport, port: 3025, proto: tcp, enabled: true,
+        comment: "tbot -> Teleport auth for Caddy TLS cert renewal. Cert plumbing only, never in the secret-fetch path" }
+  # CUT: the DMZ must NEVER reach vault. Only group:secret_consumers is admitted.
+
+# --- Declared hardware ---
+guest_cores: 2
+guest_memory: 3072
+guest_balloon: 1792
+guest_disk_gb: 16
+guest_net0: "virtio,bridge=vmbr0"
+guest_onboot: true
+guest_startup: "order=1,up=30"

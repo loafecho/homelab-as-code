@@ -1,0 +1,26 @@
+---
+# media (VM 112) - household media and file services.
+zone: home
+firewall:
+  policy_in: DROP
+  policy_out: ACCEPT
+  always_allow_established: true
+  ingress:
+    - { src: ref:admin_devices, port: 22, proto: tcp, enabled: true, comment: "T1 break-glass SSH" }
+    - { src: control, port: 22, proto: tcp, enabled: true, comment: "Ansible control" }
+    - { src: gateway, port: 8096, proto: tcp, enabled: false,
+        comment: "media server via the DMZ gateway. ENABLE when gateway is built" }
+  egress: []
+  # Carve-out: media stays a secret_consumer (vault:443 via policy_out ACCEPT).
+  # Accepted risk: media will be public-fronted through the gateway, so a
+  # compromised media guest can reach vault:443 (TLS, auth still required).
+
+# --- Declared hardware ---
+guest_cores: 4
+guest_memory: 8192
+guest_balloon: 8192
+guest_disk_gb: 64
+guest_net0: "virtio,bridge=vmbr0"
+guest_onboot: true
+guest_startup: "order=3"
+guest_machine: "q35"

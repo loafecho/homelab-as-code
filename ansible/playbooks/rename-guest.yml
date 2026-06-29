@@ -1,0 +1,58 @@
+---
+# ============================================================================
+# rename-guest.yml - a risky lifecycle operation, kept out of site.yml.
+#
+# Run it DELIBERATELY, with an out-of-band console open. The rename is gated
+# behind a var that DEFAULTS TO FALSE, and it snapshots the guest first.
+#
+#   ansible-playbook playbooks/rename-guest.yml \
+#     -e rename_vmid=112 -e rename_to=media -e do_rename=true
+# ============================================================================
+
+- name: Rename a Proxmox VM - snapshot-first, gated, idempotent
+  hosts: localhost
+  gather_facts: false
+  vars:
+    do_rename: false
+    rename_vmid: ~
+    rename_to: ~
+    _pve_api: &pve_api
+      api_host: "{{ proxmox_host.ip }}"
+      api_user: "{{ lookup('env', 'PROXMOX_API_USER') | default('automation@pve', true) }}"
+      api_token_id: "{{ lookup('env', 'PROXMOX_API_TOKEN_ID') | default(omit, true) }}"
+      api_token_secret: "{{ lookup('env', 'PROXMOX_API_TOKEN_SECRET') | default(omit, true) }}"
+      validate_certs: false
+      node: "{{ proxmox_host.name }}"
+
+  tasks:
+    - name: Announce arming state
+      ansible.builtin.debug:
+        msg:
+          - "RISKY PLAYBOOK. A snapshot is taken before the rename when armed."
+          - "do_rename={{ do_rename }} rename_vmid={{ rename_vmid }} rename_to={{ rename_to }}"
+
+    - name: Require a vmid and a new name when armed
+      ansible.builtin.assert:
+        that:
+          - rename_vmid is not none
+          - rename_to is not none
+        fail_msg: "Pass -e rename_vmid=<id> -e rename_to=<name> together with -e do_rename=true."
+        quiet: true
+      when: do_rename | bool
+
+    - name: "Snapshot the guest before the rename"
+      community.proxmox.proxmox_snap:
+        <<: *pve_api
+        vmid: "{{ rename_vmid }}"
+        snapname: "pre-rename-{{ rename_to }}"
+        state: present
+      when: do_rename | bool
+
+    - name: "Rename the guest"
+      community.proxmox.proxmox_kvm:
+        <<: *pve_api
+        vmid: "{{ rename_vmid }}"
+        name: "{{ rename_to }}"
+        state: present
+        update: true
+      when: do_rename | bool

@@ -1,0 +1,15 @@
+---
+# Ansible Galaxy collection dependencies.
+# Install with: ansible-galaxy collection install -r requirements.yml
+collections:
+  # Proxmox VE modules: community.proxmox.proxmox_kvm (VMs),
+  # community.proxmox.proxmox (LXC), proxmox_snap, proxmox_vm_info, etc.
+  # (Migrated out of community.general in its 12.0.0 release.)
+  - name: community.proxmox
+    version: ">=1.0.0"
+  # General-purpose modules/filters still used elsewhere in the estate.
+  - name: community.general
+    version: ">=8.0.0"
+  # Used by some modules for parsing/templating helpers.
+  - name: ansible.posix
+    version: ">=1.5.0"

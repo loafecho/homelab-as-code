@@ -1,0 +1,24 @@
+---
+# https://ansible.readthedocs.io/projects/lint/configuring/
+profile: moderate
+
+exclude_paths:
+  - roles/proxmox_firewall/files/expected/   # render baselines, byte-identical to build/, not Ansible content
+  - roles/vault_caddy_tls/files/expected/
+  - build/
+
+# Provisioning role bodies are partly stubbed with TODOs (see each role README).
+warn_list:
+  - ignore-errors
+  - no-changed-when
+
+skip_list:
+  # guest_* / proxmox_api_* are intentionally SHARED vars, not role-private:
+  # guest_type / guest_vmid are set per host in the inventory and read by the
+  # comparator script too. Prefixing them with the role name would break that
+  # contract, so the no-role-prefix convention does not apply here.
+  - var-naming[no-role-prefix]
+
+kinds:
+  - playbook: "playbooks/*.yml"
+  - playbook: "site.yml"

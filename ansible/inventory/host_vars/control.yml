@@ -1,0 +1,23 @@
+---
+# control (VM 100) - control plane / Ansible orchestrator.
+zone: control
+firewall:
+  policy_in: DROP
+  policy_out: ACCEPT                   # control -> all guests:22 (Ansible) is egress, covered by ACCEPT
+  always_allow_established: true
+  ingress:
+    - { src: ref:admin_devices, port: 22, proto: tcp, enabled: true, comment: "T1 break-glass SSH" }
+    - { src: monitor, port: 443, proto: tcp, enabled: true, comment: "monitor canary probe (the one tag:monitor grant)" }
+  egress: []
+  # control is the SOURCE of the "control -> all guests:22" Ansible rule. With
+  # policy_out: ACCEPT that egress needs no explicit entry here; the matching
+  # ingress (control -> :22) is declared on every guest.
+
+# --- Declared hardware (compared against live `qm config` by scripts/check-guest-config.sh) ---
+guest_cores: 8
+guest_memory: 16384
+guest_balloon: 0
+guest_disk_gb: 64
+guest_net0: "virtio,bridge=vmbr0"
+guest_onboot: true
+guest_startup: "order=1"

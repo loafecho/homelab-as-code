@@ -1,0 +1,26 @@
+---
+extends: default
+
+rules:
+  line-length:
+    max: 160
+    level: warning
+  braces:
+    max-spaces-inside: 1            # allow the readable { key: val } inline-map style
+  brackets:
+    max-spaces-inside: 1
+  comments:
+    min-spaces-from-content: 1
+  comments-indentation: disable
+  truthy:
+    allowed-values: ["true", "false"]
+    check-keys: false
+  document-start: disable          # Kubernetes manifests conventionally omit `---` on the first doc
+  octal-values:                    # required for ansible-lint compatibility
+    forbid-implicit-octal: true
+    forbid-explicit-octal: true
+
+ignore: |
+  ansible/roles/proxmox_firewall/files/expected/
+  ansible/roles/vault_caddy_tls/files/expected/
+  ansible/build/

@@ -1,0 +1,48 @@
+---
+# ============================================================================
+# proxmox_guest — generic role that provisions a Proxmox guest as either a
+# QEMU VM or an LXC container, selected by `guest_type`. One role, both shapes.
+# ============================================================================
+
+# --- Selector (REQUIRED) -----------------------------------------------------
+# "vm"  -> community.proxmox.proxmox_kvm  (tasks/vm.yml)
+# "lxc" -> community.proxmox.proxmox      (tasks/lxc.yml)
+guest_type: "{{ hostvars[inventory_hostname].guest_type | default('vm') }}"
+
+# --- Identity (resolved from inventory + the group_vars `guests` map) --------
+guest_name: "{{ inventory_hostname }}"
+guest_vmid: "{{ hostvars[inventory_hostname].guest_vmid | default(guests[inventory_hostname].vmid) | default(omit) }}"
+guest_ip: "{{ guests[inventory_hostname].ip | default(omit) }}"
+guest_zone: "{{ guests[inventory_hostname].zone | default('') }}"
+
+# Desired lifecycle state: present | started | stopped | absent.
+# Foundation default is non-destructive: ensure defined + running.
+guest_state: started
+
+# --- Proxmox API connection --------------------------------------------------
+# Values come from the environment at runtime (injected by a secrets manager);
+# never hard-code them here. token_secret is intentionally absent from git.
+proxmox_api_host: "{{ proxmox_host.ip }}"
+proxmox_node: "{{ proxmox_host.name }}"
+proxmox_api_user: "{{ lookup('env', 'PROXMOX_API_USER') | default('automation@pve', true) }}"
+proxmox_api_token_id: "{{ lookup('env', 'PROXMOX_API_TOKEN_ID') | default(omit, true) }}"
+proxmox_api_token_secret: "{{ lookup('env', 'PROXMOX_API_TOKEN_SECRET') | default(omit, true) }}"
+proxmox_validate_certs: false
+
+# --- Hardware defaults (overridable per host_vars) ---------------------------
+guest_cores: 2
+guest_memory: 2048                     # MiB
+guest_disk_gb: 16
+guest_bridge: vmbr0
+guest_net_model: virtio                # VMs; LXC uses veth
+guest_onboot: true
+
+# VM-only: clone source template (cloud-init enabled base image).
+guest_vm_template: "{{ vm_base_template | default('ubuntu-2404-cloudinit') }}"
+
+# LXC-only: OS template volume on Proxmox storage.
+guest_lxc_ostemplate: "{{ lxc_base_ostemplate | default('local:vztmpl/ubuntu-24.04-standard_amd64.tar.zst') }}"
+guest_storage: "local-lvm"
+
+# Per-VM nftables tap firewall enabled at the guest NIC (firewall=1).
+guest_firewall_enabled: true

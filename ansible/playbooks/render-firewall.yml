@@ -1,0 +1,8 @@
+---
+# Render the firewall rule files to build/firewall/ for review.
+# Pure templating on localhost — touches no live host, applies nothing.
+- name: Render Proxmox firewall rules (staging)
+  hosts: localhost
+  gather_facts: false
+  roles:
+    - role: proxmox_firewall

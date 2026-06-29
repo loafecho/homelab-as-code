@@ -1,0 +1,52 @@
+---
+# proxmox_guest :: VM path (community.proxmox.proxmox_kvm)
+#
+# FOUNDATION STUB: the connection + module wiring and the variable contract are
+# real, but the heavy provisioning body (clone from cloud-init template, cloud-init
+# user-data with a short-TTL secrets-agent identity, disk resize, per-guest
+# identity rotation on first boot) is deferred to a later change. Each TODO marks the
+# step a follow-up fills. Module calls are check-mode safe.
+
+# The check_mode: "{{ ansible_check_mode }}" directives that sat on
+# these tasks were INERT (that is already the default) and removed. The modules
+# declare supports_check_mode=False, so they skip under --check regardless — and
+# the tempting "fix", check_mode: false, would turn every --check run into a live
+# apply (state: present, update: true). Forbidden by scripts/lint-no-check-mode-false.sh;
+# real drift detection is scripts/check-guest-config.sh.
+
+- name: "Ensure VM is defined — {{ guest_name }}"
+  community.proxmox.proxmox_kvm:
+    api_host: "{{ proxmox_api_host }}"
+    api_user: "{{ proxmox_api_user }}"
+    api_token_id: "{{ proxmox_api_token_id }}"
+    api_token_secret: "{{ proxmox_api_token_secret }}"
+    validate_certs: "{{ proxmox_validate_certs }}"
+    node: "{{ proxmox_node }}"
+    vmid: "{{ guest_vmid }}"
+    name: "{{ guest_name }}"
+    # TODO: clone: "{{ guest_vm_template }}"  + full=true on first create.
+    cores: "{{ guest_cores }}"
+    memory: "{{ guest_memory }}"
+    net:
+      net0: "{{ guest_net_model }},bridge={{ guest_bridge }},firewall={{ 1 if guest_firewall_enabled else 0 }}"
+    onboot: "{{ guest_onboot }}"
+    state: present
+    update: true
+  # TODO: cloud-init (ciuser/cipassword from the secrets manager, ipconfig0 with
+  # the reserved static guest_ip, sshkeys), disk resize to guest_disk_gb.
+  register: _vm_define
+
+# TODO: inject cloud-init user-data carrying the short-TTL secrets-agent
+# machine identity; on first boot it rotates to a per-guest identity.
+
+- name: "Set VM power state for {{ guest_name }}"
+  community.proxmox.proxmox_kvm:
+    api_host: "{{ proxmox_api_host }}"
+    api_user: "{{ proxmox_api_user }}"
+    api_token_id: "{{ proxmox_api_token_id }}"
+    api_token_secret: "{{ proxmox_api_token_secret }}"
+    validate_certs: "{{ proxmox_validate_certs }}"
+    node: "{{ proxmox_node }}"
+    vmid: "{{ guest_vmid }}"
+    state: "{{ guest_state }}"
+  when: guest_state in ['started', 'stopped']

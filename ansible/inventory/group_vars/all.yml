@@ -1,0 +1,62 @@
+---
+# ============================================================================
+# group_vars/all.yml: single source of truth for the network data model.
+#
+# Every firewall rule, render and comparator resolves names through the maps
+# below. Change a value here, re-render, review the diff against the
+# committed baselines, then apply. Addresses are RFC 5737 examples.
+# ============================================================================
+
+lan_cidr: "192.0.2.0/24"
+lan_gateway: "192.0.2.1"              # router: DHCP, DNS, NTP
+dns_server: "192.0.2.1"
+dhcp_pool: "192.0.2.150-192.0.2.199"
+
+# Proxmox host (NOT a guest; its :8006 lives in cluster.fw, not a <vmid>.fw).
+proxmox_host:
+  name: hypervisor
+  ip: "192.0.2.10"
+  mgmt_port: 8006                     # web UI + noVNC out-of-band console
+
+# Break-glass SSH (T1) and noVNC console (T2) sources: ONLY these addresses,
+# each with a DHCP reservation on the router.
+admin_devices:
+  - { name: admin-laptop, ip: "192.0.2.50" }
+  - { name: admin-workstation, ip: "192.0.2.51" }
+
+# Canonical guest map: vmid + zone + reserved IP + egress policy.
+guests:
+  control: { vmid: 100, ip: "192.0.2.100", zone: control, egress_policy: accept }
+  vault: { vmid: 101, ip: "192.0.2.101", zone: secrets, egress_policy: drop }
+  media: { vmid: 112, ip: "192.0.2.112", zone: home, egress_policy: accept }
+  teleport: { vmid: 115, ip: "192.0.2.115", zone: access, egress_policy: accept }
+  kube: { vmid: 130, ip: "192.0.2.130", zone: cluster, egress_policy: accept }
+  # monitor: RPi, NOT a Proxmox guest. Enforced at the Tailscale ACL + ufw.
+  monitor: { vmid: ~, ip: "192.0.2.190", zone: monitor, egress_policy: accept }
+  # gateway: DMZ reverse proxy, NOT BUILT. Assign IP + reservation when provisioned.
+  gateway: { vmid: ~, ip: ~, zone: dmz, egress_policy: accept }
+
+# Trust zones. Default-deny east-west AND intra-zone; explicit allow-only.
+zones:
+  control: "control: orchestrator, SSH to every guest (Ansible)"
+  secrets: "vault: Infisical secrets sink; egress DROP; never reached from the DMZ"
+  access: "teleport: audited access plane for outside integrations"
+  home: "media: household services"
+  dmz: "gateway: public traffic terminates here (not built yet)"
+  monitor: "monitor (Pi): untrusted; probes the break-glass paths"
+  cluster: "kube: Kubernetes node; internal segmentation is Cilium NetworkPolicy per namespace"
+
+# Hosts allowed to fetch secrets from vault (all resolve to the vault:443 target).
+# The home zone is a deliberate, documented carve-out: media fetches its own
+# app credentials. The DMZ must never appear here.
+secret_consumers: [control, teleport, media]
+
+vault_endpoint:
+  ip: "192.0.2.101"
+  port: 443                           # served by roles/vault_caddy_tls once deployed
+
+# Live vmids deliberately NOT managed by this repo. scripts/check-guest-config.sh
+# fails on any live vmid absent from BOTH the inventory and this allowlist, so
+# removing an entry without inventorying the guest turns the gate red, by design.
+unmanaged_vmids:
+  - 120   # scratch VM on an internal-only bridge, no LAN address

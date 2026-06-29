@@ -1,0 +1,17 @@
+{#- Rendered by roles/proxmox_firewall — STAGING ONLY, do not hand-edit. -#}
+# /etc/pve/firewall/cluster.fw  (datacenter level)
+# GENERATED — edit group_vars/all.yml (admin_devices / proxmox_host), never this file.
+#
+# The :8006 web UI / noVNC console is a HOST port, not a guest tap.
+# It belongs HERE, not in any <vmid>.fw.
+[OPTIONS]
+enable: 1
+policy_in: DROP
+policy_out: ACCEPT
+
+[RULES]
+# T2 out-of-band: admin_devices -> {{ proxmox_host.name }}:{{ proxmox_host.mgmt_port }} (noVNC console)
+{% for dev in admin_devices %}
+IN ACCEPT -source {{ dev.ip }} -p tcp -dport {{ proxmox_host.mgmt_port }} # T2 noVNC OOB ({{ dev.name }})
+{% endfor %}
+# NOTE: per-guest east-west rules live in build/firewall/<vmid>.fw, not here.

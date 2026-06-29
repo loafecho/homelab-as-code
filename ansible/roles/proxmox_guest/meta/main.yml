@@ -1,0 +1,16 @@
+---
+galaxy_info:
+  role_name: proxmox_guest
+  author: loafecho
+  description: Generic Proxmox guest provisioner — VM or LXC selected by guest_type.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: Debian
+      versions:
+        - bookworm
+  galaxy_tags:
+    - proxmox
+    - virtualization
+    - infrastructure
+dependencies: []

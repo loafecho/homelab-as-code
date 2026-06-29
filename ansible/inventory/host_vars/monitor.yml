@@ -1,0 +1,15 @@
+---
+# monitor - Raspberry Pi. NOT a Proxmox guest (vmid: null).
+# NEVER provisioned by Ansible and NO per-guest <vmid>.fw is rendered for it.
+# Segmentation for it is enforced at the Tailscale ACL (tag:monitor) and the
+# Pi's own ufw. This file documents intent only.
+zone: monitor
+firewall:
+  policy_in: DROP
+  policy_out: ACCEPT
+  always_allow_established: true
+  # Allowed reach (declared on the destination guests):
+  #   monitor -> vault:443     (uptime probe)
+  #   monitor -> control:443   (canary)
+  ingress: []
+  egress: []

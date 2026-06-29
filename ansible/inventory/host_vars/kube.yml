@@ -1,0 +1,33 @@
+---
+# kube (VM 130) - the single-node Kubernetes cluster (kubeadm + Cilium).
+#
+# Its own trust zone: the node carries workloads of different sensitivity at
+# once, so folding it into any existing zone would over-grant in one direction.
+# The fine-grained segmentation is INSIDE the node (Cilium NetworkPolicy,
+# default-deny per namespace, plus per-namespace RBAC and per-namespace
+# secret-store identities; see kubernetes/). This tap is the coarse outer ring.
+#
+# Closes a common exposure: without policy_in DROP, :6443 answers to every
+# host on the LAN, plus Hubble :4244 and Cilium metrics :9963/:9964 (host
+# network ports that no Service publishes).
+zone: cluster
+firewall:
+  policy_in: DROP
+  policy_out: ACCEPT       # image pulls, tailnet, upstream APIs; all app-initiated
+  always_allow_established: true
+  ingress:
+    - { src: ref:admin_devices, port: 22, proto: tcp, enabled: true, comment: "T1 break-glass SSH" }
+    - { src: control, port: 22, proto: tcp, enabled: true, comment: "Ansible control" }
+    - { src: control, port: 6443, proto: tcp, enabled: true,
+        comment: "kubectl/helm/Argo CLI from the control node, the ONLY allowed path to the API server" }
+    # Deliberately NOT opened: Hubble :4244 and Cilium metrics :9963/:9964.
+  egress: []
+
+# --- Declared hardware ---
+guest_cores: 8
+guest_memory: 24576
+guest_balloon: 0
+guest_disk_gb: 32
+guest_scsi1_gb: 250
+guest_net0: "virtio,bridge=vmbr0"
+guest_onboot: true

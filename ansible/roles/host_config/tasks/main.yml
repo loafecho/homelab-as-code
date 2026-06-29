@@ -1,0 +1,18 @@
+---
+# roles/host_config — STUB for per-host base config.
+# Intended scope: console/admin password from the secrets manager, SSH bound
+# for break-glass access, managed /etc/hosts entries, compose stack bring-up.
+- name: Per-host config (stub)
+  ansible.builtin.debug:
+    msg: "host_config role is a foundation stub; per-host configuration is not implemented yet."
+
+# This is the ONLY task in site.yml that actually connects to each guest.
+# Everything else is controller-side (debug/assert/delegate_to localhost) or
+# skipped in check mode (the proxmox modules), so without it a dead host could
+# never surface as unreachable and the drift gate's ERROR state would be
+# unreachable code. ansible.builtin.ping supports check mode and executes
+# remotely even under --check. become: false — reachability needs no
+# privilege, and a become path must not be able to mask a transport failure.
+- name: Reachability probe (check-mode safe; feeds the gate's ERROR verdict)
+  ansible.builtin.ping:
+  become: false

@@ -1,0 +1,65 @@
+{#- Rendered by roles/proxmox_firewall — STAGING ONLY, do not hand-edit. -#}
+{#- Source: host_vars/<guest>.yml (firewall data) + group_vars/all.yml (IPs). -#}
+{%- set fw = hostvars[fw_guest].firewall -%}
+{%- set lines = [] -%}
+{%- for rule in fw.ingress -%}
+{%-   if rule.src == 'internet' -%}
+{%-     set srcs = ['any'] -%}
+{%-   elif rule.src.startswith('group:') -%}
+{%-     set srcs = lookup('vars', rule.src.split(':')[1]) | map('extract', guests, 'ip') | select('string') | list -%}
+{%-   elif rule.src.startswith('ref:') -%}
+{%-     set srcs = lookup('vars', rule.src.split(':')[1]) | map(attribute='ip') | select('string') | list -%}
+{%-   elif guests[rule.src].ip -%}
+{%-     set srcs = [guests[rule.src].ip] -%}
+{%-   else -%}
+{%-     set srcs = [] -%}
+{%-   endif -%}
+{%-   if srcs | length == 0 -%}
+{{-     lines.append("# UNRESOLVED src '" ~ rule.src ~ "' (no IP yet) -> " ~ rule.port ~ "/" ~ rule.proto ~ " # " ~ rule.comment) or "" -}}
+{%-   endif -%}
+{%-   for s in srcs -%}
+{%-     set prefix = "" if rule.enabled else "# DISABLED: " -%}
+{%-     set src_tok = "" if s == 'any' else ("-source " ~ s ~ " ") -%}
+{{-     lines.append(prefix ~ "IN ACCEPT " ~ src_tok ~ "-p " ~ rule.proto ~ " -dport " ~ rule.port ~ " # " ~ rule.comment) or "" -}}
+{%-   endfor -%}
+{%- endfor -%}
+{#- Egress allow-list: needed for any guest whose policy_out is DROP (today -#}
+{#- only vault). always_allow_established covers RETURN traffic on -#}
+{#- connections the guest did not initiate — it does NOT cover new outbound -#}
+{#- sessions, so those need an explicit OUT ACCEPT rule, mirroring the -#}
+{#- ingress src-resolution above but keyed on `dest`. -#}
+{%- for rule in fw.egress | default([]) -%}
+{%-   if rule.dest == 'internet' -%}
+{%-     set dsts = ['any'] -%}
+{%-   elif rule.dest.startswith('group:') -%}
+{%-     set dsts = lookup('vars', rule.dest.split(':')[1]) | map('extract', guests, 'ip') | select('string') | list -%}
+{%-   elif rule.dest.startswith('ref:') -%}
+{%-     set dsts = lookup('vars', rule.dest.split(':')[1]) | map(attribute='ip') | select('string') | list -%}
+{%-   elif guests[rule.dest].ip -%}
+{%-     set dsts = [guests[rule.dest].ip] -%}
+{%-   else -%}
+{%-     set dsts = [] -%}
+{%-   endif -%}
+{%-   if dsts | length == 0 -%}
+{{-     lines.append("# UNRESOLVED dest '" ~ rule.dest ~ "' (no IP yet) -> " ~ rule.port ~ "/" ~ rule.proto ~ " # " ~ rule.comment) or "" -}}
+{%-   endif -%}
+{%-   for d in dsts -%}
+{%-     set prefix = "" if rule.enabled else "# DISABLED: " -%}
+{%-     set dst_tok = "" if d == 'any' else ("-dest " ~ d ~ " ") -%}
+{{-     lines.append(prefix ~ "OUT ACCEPT " ~ dst_tok ~ "-p " ~ rule.proto ~ " -dport " ~ rule.port ~ " # " ~ rule.comment) or "" -}}
+{%-   endfor -%}
+{%- endfor -%}
+# /etc/pve/firewall/{{ guests[fw_guest].vmid }}.fw  ({{ fw_guest }}, zone={{ hostvars[fw_guest].zone }})
+# GENERATED — edit host_vars/{{ fw_guest }}.yml, never this file.
+[OPTIONS]
+enable: 1
+policy_in: {{ fw.policy_in }}
+policy_out: {{ fw.policy_out }}
+{% if fw.always_allow_established | default(true) %}
+# established/related replies auto-accepted by conntrack
+{% endif %}
+
+[RULES]
+{% for line in lines %}
+{{ line }}
+{% endfor %}

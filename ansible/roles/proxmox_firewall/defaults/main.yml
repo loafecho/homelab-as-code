@@ -1,0 +1,18 @@
+---
+# proxmox_firewall — renders Proxmox host nftables rule files from the per-host
+# `firewall` data (host_vars) + the datacenter cluster.fw.
+#
+# Renders to a STAGING dir for review only. Nothing is written to
+# /etc/pve/firewall and nothing is applied. A later, deliberate change flips
+# firewall_apply: true to copy into place on the Proxmox host and reload.
+
+# Staging output dir (gitignored). Reviewed by hand before any apply.
+# Anchored to the inventory dir so it resolves to <repo>/build/firewall no matter
+# which playbook (site.yml at root, or playbooks/*.yml) invokes the role.
+firewall_build_dir: "{{ inventory_dir }}/../build/firewall"
+
+# Safety switch — keep false until a deliberate, snapshot-backed apply.
+firewall_apply: false
+
+# Live target on the Proxmox host (used only when firewall_apply: true, later).
+firewall_live_dir: "/etc/pve/firewall"

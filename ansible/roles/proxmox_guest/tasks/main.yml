@@ -1,0 +1,26 @@
+---
+# proxmox_guest — dispatch on guest_type. Idempotent; safe to re-run.
+
+- name: Assert guest_type is valid
+  ansible.builtin.assert:
+    that:
+      - guest_type in ['vm', 'lxc']
+    fail_msg: "guest_type must be 'vm' or 'lxc' (got: {{ guest_type }})"
+    quiet: true
+
+- name: Skip guests with no vmid (monitor = RPi, gateway = not built)
+  ansible.builtin.debug:
+    msg: "{{ guest_name }} has no vmid — not Proxmox-provisioned, skipping."
+  when: guest_vmid is not defined or guest_vmid in [None, '', omit]
+
+- name: Provision QEMU VM
+  ansible.builtin.include_tasks: vm.yml
+  when:
+    - guest_type == 'vm'
+    - guest_vmid not in [None, '', omit]
+
+- name: Provision LXC container
+  ansible.builtin.include_tasks: lxc.yml
+  when:
+    - guest_type == 'lxc'
+    - guest_vmid not in [None, '', omit]

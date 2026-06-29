@@ -1,0 +1,42 @@
+---
+# proxmox_guest :: LXC path (community.proxmox.proxmox)
+#
+# FOUNDATION STUB: connection + module wiring and the variable contract are real;
+# the heavy body (ostemplate create, static IP netif, unprivileged + nesting
+# features, secrets-agent identity seed) is deferred to a later change. check-mode safe.
+
+# Inert check_mode: "{{ ansible_check_mode }}" directives were removed --
+# see the tasks/vm.yml header note. NEVER add check_mode: false
+# (it makes --check a live apply); lint enforces this.
+
+- name: "Ensure CT is defined — {{ guest_name }}"
+  community.proxmox.proxmox:
+    api_host: "{{ proxmox_api_host }}"
+    api_user: "{{ proxmox_api_user }}"
+    api_token_id: "{{ proxmox_api_token_id }}"
+    api_token_secret: "{{ proxmox_api_token_secret }}"
+    validate_certs: "{{ proxmox_validate_certs }}"
+    node: "{{ proxmox_node }}"
+    vmid: "{{ guest_vmid }}"
+    hostname: "{{ guest_name }}"
+    ostemplate: "{{ guest_lxc_ostemplate }}"
+    storage: "{{ guest_storage }}"
+    cores: "{{ guest_cores }}"
+    memory: "{{ guest_memory }}"
+    disk: "{{ guest_disk_gb }}"
+    # TODO: netif with the reserved static guest_ip + firewall=1 tap,
+    # unprivileged: true, features (nesting/keyctl), secrets-agent identity seed.
+    onboot: "{{ guest_onboot }}"
+    state: present
+  register: _ct_define
+
+- name: "Set CT power state for {{ guest_name }}"
+  community.proxmox.proxmox:
+    api_host: "{{ proxmox_api_host }}"
+    api_user: "{{ proxmox_api_user }}"
+    api_token_id: "{{ proxmox_api_token_id }}"
+    api_token_secret: "{{ proxmox_api_token_secret }}"
+    validate_certs: "{{ proxmox_validate_certs }}"
+    vmid: "{{ guest_vmid }}"
+    state: "{{ guest_state }}"
+  when: guest_state in ['started', 'stopped']
