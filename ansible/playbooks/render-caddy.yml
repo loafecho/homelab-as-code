@@ -1,0 +1,11 @@
+---
+# Render the vault Caddy TLS front (Caddyfile + tbot.yaml) to build/caddy/ for
+# review. Pure templating delegated to localhost — vault_caddy_tls_deploy stays
+# false, so nothing is installed on or copied to the live vault host. Run on its
+# own so the render can be materialized for real and diffed against a committed
+# reference, instead of reporting check-mode 'changed' forever.
+- name: Render vault Caddy TLS front (staging)
+  hosts: vault
+  gather_facts: false
+  roles:
+    - role: vault_caddy_tls

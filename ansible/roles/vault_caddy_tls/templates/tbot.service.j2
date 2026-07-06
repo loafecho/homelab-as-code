@@ -1,0 +1,19 @@
+{#- Rendered by roles/vault_caddy_tls; only installed when vault_caddy_tls_deploy: true. -#}
+[Unit]
+Description=tbot - Teleport Machine ID (vault Caddy TLS cert renewal)
+Documentation=https://goteleport.com/docs/machine-id/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/tbot start -c /etc/tbot/tbot.yaml
+Restart=on-failure
+RestartSec=5
+User=root
+# tbot only ever WRITES cert material locally + talks to the Teleport
+# proxy/auth ({{ teleport_proxy_addr }}) — it never touches
+# Infisical or the secret-fetch path.
+
+[Install]
+WantedBy=multi-user.target

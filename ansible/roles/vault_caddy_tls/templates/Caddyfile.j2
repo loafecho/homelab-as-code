@@ -1,0 +1,26 @@
+{#- Rendered by roles/vault_caddy_tls. When vault_caddy_tls_deploy is false   -#}
+{#- (default) this only ever lands in build/caddy/Caddyfile for review — see  -#}
+{#- roles/vault_caddy_tls/README.md before it is ever copied to the live     -#}
+{#- vault host. Source: defaults/main.yml + group_vars/all.yml. -#}
+{
+	# No public ACME: this is a LAN-only name/IP behind a Teleport `db`-CA
+	# leaf cert, not a publicly trusted CA — auto_https would otherwise try
+	# (and fail) to obtain a Let's Encrypt cert for it.
+	auto_https off
+	admin off
+}
+
+:{{ vault_caddy_tls_listen_port }} {
+	tls {{ vault_caddy_tls_cert_path }} {{ vault_caddy_tls_key_path }}
+
+	# Infisical is bare HTTP on {{ vault_caddy_upstream_host }}:{{ vault_caddy_upstream_port }} today
+	# (docker maps 0.0.0.0:80->8080 on the vault VM). Caddy should be the ONLY
+	# consumer of that port — host_vars/vault.yml's policy_in DROP with no :80
+	# ingress rule already enforces that nothing else on the LAN can reach it.
+	reverse_proxy {{ vault_caddy_upstream_host }}:{{ vault_caddy_upstream_port }}
+
+	log {
+		output file /var/log/caddy/vault-access.log
+		format json
+	}
+}

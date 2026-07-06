@@ -1,0 +1,110 @@
+---
+# LIVE ROLLOUT — only reached when vault_caddy_tls_deploy: true is passed
+# explicitly, e.g.:
+#   ansible-playbook site.yml --limit vault -e vault_caddy_tls_deploy=true
+#
+# Do this deliberately, NOT as part of routine site.yml convergence runs, and
+# only after the one-time out-of-band Teleport setup below:
+#   1. On the teleport guest: register a placeholder database resource so the
+#      `db` CA has something to sign against —
+#        tctl auth sign --format=db --host={{ teleport_cert_common_name }} \
+#          --out=/tmp/vault-bootstrap --ttl={{ teleport_cert_ttl }}
+#      (first cert; tbot takes over renewal afterwards using the same CA).
+#   2. Mint a join token for this bot: `tctl bots add {{ teleport_bot_name }}
+#      --roles=<role-scoped-to-db-signing>` and drop the resulting token at
+#      the path this role pushes to /run/tbot/join-token (out of band —
+#      the secrets manager or a one-time manual copy, NEVER in git).
+#
+# vault's firewall has policy_out: DROP (host_vars/vault.yml) — vault must
+# NEVER initiate outbound fetches. So the tbot binary is pulled by the Ansible
+# control node and PUSHED to vault over the already-allowed
+# control->vault:22 SSH channel, not fetched by vault itself.
+
+- name: Fetch tbot release tarball to the control node cache (not vault)
+  ansible.builtin.get_url:
+    url: "https://cdn.teleport.dev/tbot-v18.8.3-linux-amd64-bin.tar.gz"
+    dest: "/tmp/tbot-v18.8.3-linux-amd64-bin.tar.gz"
+    mode: "0644"
+  delegate_to: localhost
+  run_once: true
+
+- name: Install Caddy (apt)
+  ansible.builtin.apt:
+    name: caddy
+    state: present
+    update_cache: true
+
+- name: Ensure Caddy TLS material directory exists
+  ansible.builtin.file:
+    path: "{{ vault_caddy_tls_dir }}"
+    state: directory
+    owner: caddy
+    group: caddy
+    mode: "0750"
+
+- name: Ensure tbot config/state directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0700"
+  loop:
+    - /etc/tbot
+    - /var/lib/tbot
+    - /run/tbot
+
+- name: Push tbot binary from control-node cache to vault
+  ansible.builtin.unarchive:
+    src: "/tmp/tbot-v18.8.3-linux-amd64-bin.tar.gz"
+    dest: /usr/local/bin
+    remote_src: false
+    extra_opts:
+      - "--strip-components=1"
+      - "teleport/tbot"
+    mode: "0755"
+
+- name: Push tbot config
+  ansible.builtin.template:
+    src: tbot.yaml.j2
+    dest: /etc/tbot/tbot.yaml
+    mode: "0600"
+  notify: Restart tbot
+
+- name: Push tbot systemd unit
+  ansible.builtin.template:
+    src: tbot.service.j2
+    dest: /etc/systemd/system/tbot.service
+    mode: "0644"
+  notify: Restart tbot
+
+- name: Push Caddyfile
+  ansible.builtin.template:
+    src: Caddyfile.j2
+    dest: /etc/caddy/Caddyfile
+    mode: "0644"
+  notify: Reload caddy
+
+- name: Enable + start tbot
+  ansible.builtin.systemd:
+    name: tbot
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Enable + start Caddy
+  ansible.builtin.systemd:
+    name: caddy
+    enabled: true
+    state: started
+
+- name: Flush handlers so cert + config land before we report done
+  ansible.builtin.meta: flush_handlers
+
+- name: Report live rollout complete
+  ansible.builtin.debug:
+    msg: >-
+      Caddy TLS front live on vault ({{ guests.vault.ip }}):{{ vault_caddy_tls_listen_port }}
+      -> {{ vault_caddy_upstream_host }}:{{ vault_caddy_upstream_port }}. Verify with
+      `curl -vk https://{{ guests.vault.ip }}:{{ vault_caddy_tls_listen_port }}/api/status`
+      from a secret_consumer before relying on it, and confirm no firewall
+      policy flip has already dropped :80 traffic that legacy consumers might
+      still be using.

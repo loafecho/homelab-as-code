@@ -1,0 +1,9 @@
+---
+# Validate + stage the slimmed Tailscale ACL to build/tailscale/ for review.
+# Pure offline hujson parse + policy lint on localhost — no tailnet access,
+# no credentials, and nothing is pushed to the live tailnet.
+- name: Validate and stage the Tailscale admin-plane ACL (staging)
+  hosts: localhost
+  gather_facts: false
+  roles:
+    - role: tailscale_acl

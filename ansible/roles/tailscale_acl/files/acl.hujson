@@ -1,0 +1,16 @@
+// Slimmed Tailscale ACL — admin plane ONLY, no service mesh.
+// Segmentation lives in the Proxmox host firewall; the tailnet is just the
+// administrator's remote door. Validated and staged by roles/tailscale_acl.
+{
+  "tagOwners": {
+    "tag:admin": ["autogroup:admin"],
+    "tag:monitor": ["autogroup:admin"]
+  },
+  "acls": [
+    // Admin plane: tagged admin devices reach SSH / HTTPS / Proxmox console
+    { "action": "accept", "src": ["tag:admin"], "dst": ["*:22", "*:443", "*:8006"] },
+    // monitor -> control canary (the one monitor grant)
+    { "action": "accept", "src": ["tag:monitor"], "dst": ["control:443"] }
+    // NOTE: this REPLACES any broad service-to-service tailnet ACL.
+  ]
+}

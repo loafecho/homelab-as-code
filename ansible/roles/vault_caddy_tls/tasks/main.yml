@@ -1,0 +1,52 @@
+---
+# vault_caddy_tls — thin Caddy TLS front for vault. Makes
+# group_vars/all.yml `vault_endpoint.port: 443` and host_vars/vault.yml's
+# secret_consumers ingress rule correspond to a REAL listener, closing the
+# gap where a firewall flip would silently break every secret_consumer
+# (they'd hit dead :443 while :80 is DROPped).
+#
+# STAGED BY DEFAULT (vault_caddy_tls_deploy: false): this only renders the
+# Caddyfile + tbot config to build/caddy/ for review. Nothing is installed on
+# or copied to the live vault host unless a later, deliberate
+# run explicitly passes -e vault_caddy_tls_deploy=true — see README.md.
+
+- name: Guard - this role only targets the vault host
+  ansible.builtin.assert:
+    that:
+      - inventory_hostname == 'vault'
+    fail_msg: "vault_caddy_tls should only be applied to the vault host (got {{ inventory_hostname }})."
+
+- name: Ensure Caddy staging dir exists (build/caddy, gitignored)
+  ansible.builtin.file:
+    path: "{{ vault_caddy_build_dir }}"
+    state: directory
+    mode: "0755"
+  delegate_to: localhost
+
+- name: Render Caddyfile to staging (review only)
+  ansible.builtin.template:
+    src: Caddyfile.j2
+    dest: "{{ vault_caddy_build_dir }}/Caddyfile"
+    mode: "0644"
+  delegate_to: localhost
+
+- name: Render tbot config to staging (review only)
+  ansible.builtin.template:
+    src: tbot.yaml.j2
+    dest: "{{ vault_caddy_build_dir }}/tbot.yaml"
+    mode: "0600"
+  delegate_to: localhost
+
+- name: Report staging location
+  ansible.builtin.debug:
+    msg: >-
+      Rendered Caddy + tbot config to {{ vault_caddy_build_dir }} (review only).
+      vault_caddy_tls_deploy={{ vault_caddy_tls_deploy }} — nothing installed on
+      vault ({{ guests.vault.ip }}). Flip -e vault_caddy_tls_deploy=true for a
+      deliberate, staged live rollout (see roles/vault_caddy_tls/README.md).
+
+# Real install steps — gated. Executes against the live vault host ONLY when
+# vault_caddy_tls_deploy is explicitly set true (default false everywhere).
+- name: Live rollout (gated — default OFF)
+  ansible.builtin.import_tasks: deploy.yml
+  when: vault_caddy_tls_deploy | bool

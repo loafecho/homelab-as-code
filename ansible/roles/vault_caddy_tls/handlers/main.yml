@@ -1,0 +1,11 @@
+---
+- name: Reload caddy
+  ansible.builtin.systemd:
+    name: caddy
+    state: reloaded
+
+- name: Restart tbot
+  ansible.builtin.systemd:
+    name: tbot
+    state: restarted
+    daemon_reload: true

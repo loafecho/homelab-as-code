@@ -1,0 +1,60 @@
+---
+# roles/tailscale_acl — validate + stage the slimmed admin-plane ACL.
+#
+# Segmentation now lives in the host firewall (roles/proxmox_firewall), NOT
+# the tailnet. This role only proves files/acl.hujson is well-formed and
+# matches the LOCKED admin-plane policy (tag:admin -> SSH/admin ports, one
+# narrow tag:monitor -> control:443 grant), then stages it to build/ for
+# review. It never calls the Tailscale API and never touches the live tailnet.
+
+- name: Ensure Tailscale ACL staging dir exists
+  ansible.builtin.file:
+    path: "{{ tailscale_acl_build_dir }}"
+    state: directory
+    mode: "0755"
+  delegate_to: localhost
+  run_once: true
+
+- name: Validate acl.hujson (offline hujson parse + admin-plane policy lint)
+  ansible.builtin.command:
+    argv:
+      - python3
+      - "{{ role_path }}/files/validate_acl.py"
+      - "{{ tailscale_acl_src }}"
+  register: tailscale_acl_validation
+  changed_when: false
+  delegate_to: localhost
+  run_once: true
+
+- name: Report ACL validation result
+  ansible.builtin.debug:
+    msg: "{{ tailscale_acl_validation.stdout }}"
+  run_once: true
+
+- name: Stage the validated ACL to build/ for review
+  ansible.builtin.copy:
+    src: "{{ tailscale_acl_src }}"
+    dest: "{{ tailscale_acl_build_dir }}/acl.hujson"
+    mode: "0644"
+  delegate_to: localhost
+  run_once: true
+
+- name: Report staging location
+  ansible.builtin.debug:
+    msg: >-
+      Staged validated ACL to {{ tailscale_acl_build_dir }}/acl.hujson (review only).
+      tailscale_acl_apply={{ tailscale_acl_apply }} — nothing pushed to the live tailnet.
+  run_once: true
+
+# SAFETY: even when tailscale_acl_apply is flipped true, this role has no code
+# path that reaches the Tailscale API. A wrong slimmed ACL pushed live is a
+# lockout risk, so the push is deliberately left to a reviewed,
+# snapshot-of-current-ACL-first change. This task only surfaces intent.
+- name: Refuse to push — live apply is not implemented
+  ansible.builtin.fail:
+    msg: >-
+      tailscale_acl_apply is true, but pushing to the live tailnet is NOT
+      implemented (by design — see roles/tailscale_acl/README.md).
+      Validation + staging already ran above; nothing further happens here.
+  when: tailscale_acl_apply | default(false) | bool
+  run_once: true

@@ -1,0 +1,15 @@
+---
+# roles/tailscale_acl — defaults.
+
+# Staging output dir (gitignored, same pattern as roles/proxmox_firewall).
+# Anchored to the inventory dir so it resolves to <repo>/build/tailscale no
+# matter which playbook invokes the role.
+tailscale_acl_build_dir: "{{ inventory_dir }}/../build/tailscale"
+
+# Source-of-truth ACL file (hand-authored, hujson). Never edit the staged copy.
+tailscale_acl_src: "{{ role_path }}/files/acl.hujson"
+
+# Safety switch. Flipping this alone does nothing: the push task itself is
+# not implemented (see tasks/main.yml), so there is no code path in this repo
+# that can reach the live tailnet, on purpose.
+tailscale_acl_apply: false
