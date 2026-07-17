@@ -1,0 +1,20 @@
+# Example kubeadm configuration for the single node. Not applied by Argo CD:
+# used once with `kubeadm init --config` (with kube-proxy skipped, since
+# Cilium replaces it). Pod and service ranges are examples inside
+# 172.16.0.0/12; choose ranges that do not overlap your LAN or tailnet.
+apiVersion: kubeadm.k8s.io/v1beta4
+kind: InitConfiguration
+localAPIEndpoint:
+  advertiseAddress: 192.0.2.130
+  bindPort: 6443
+skipPhases:
+  - addon/kube-proxy
+---
+apiVersion: kubeadm.k8s.io/v1beta4
+kind: ClusterConfiguration
+kubernetesVersion: v1.33.0
+controlPlaneEndpoint: 192.0.2.130:6443
+networking:
+  podSubnet: 172.20.0.0/16
+  serviceSubnet: 172.21.0.0/16
+  dnsDomain: cluster.local

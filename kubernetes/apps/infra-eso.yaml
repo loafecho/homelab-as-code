@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: infra-eso
+  namespace: argocd
+spec:
+  project: cluster
+  source:
+    repoURL: https://github.com/loafecho/homelab-as-code.git
+    targetRevision: main
+    path: kubernetes/infra/eso
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: apps
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - RespectIgnoreDifferences=true
+  # The Tailscale operator rewrites the egress Service's externalName at
+  # runtime; without this, selfHeal reverts it in seconds and breaks egress.
+  ignoreDifferences:
+    - kind: Service
+      namespace: external-secrets
+      name: vault-egress
+      jsonPointers:
+        - /spec/externalName

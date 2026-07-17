@@ -1,0 +1,25 @@
+# Namespaces are zone-aligned: every workload namespace starts default-deny
+# (infra/netpol) and gets its own secret-store identity (infra/eso).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: apps
+  labels:
+    zone: apps
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: notify
+  labels:
+    zone: notify
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: external-secrets
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tailscale

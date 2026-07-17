@@ -1,0 +1,13 @@
+# Cilium Helm values. CNI is deliberately outside Argo CD (bootstrap dependency).
+k8sServiceHost: 192.0.2.130        # the node's address; kube-proxy is replaced, so Cilium dials the API directly
+k8sServicePort: 6443
+kubeProxyReplacement: true
+operator:
+  replicas: 1
+ipam:
+  mode: cluster-pool
+  operator:
+    clusterPoolIPv4PodCIDRList: ["172.20.0.0/16"]   # must match podSubnet in bootstrap/kubeadm-config.example.yaml
+    clusterPoolIPv4MaskSize: 24
+socketLB:
+  hostNamespaceOnly: true

@@ -1,0 +1,28 @@
+# Tailscale egress proxy: gives the ESO controller an in-cluster path to the
+# secrets host's existing `tailscale serve` TLS endpoint (a real Let's Encrypt
+# certificate), so SecretStore hostAPI can be https without changing the host.
+# The operator rewrites spec.externalName at runtime to point at its proxy
+# Service in ns tailscale; the infra-eso Application carries ignoreDifferences
+# for that field (with RespectIgnoreDifferences) so selfHeal doesn't fight it.
+#
+# Companion config (kubeadm CoreDNS addon, not Argo-managed): a CoreDNS rewrite
+# so the secrets host's tailnet name resolves in-cluster to this Service:
+#   rewrite stop {
+#     name exact vault.example.com vault-egress.external-secrets.svc.cluster.local
+#     answer auto
+#   }
+# ACL side: the cluster's tag needs exactly one grant, to the secrets host on :443.
+apiVersion: v1
+kind: Service
+metadata:
+  name: vault-egress
+  namespace: external-secrets
+  annotations:
+    tailscale.com/tailnet-fqdn: vault.example.com
+spec:
+  type: ExternalName
+  externalName: placeholder
+  ports:
+    - name: https
+      port: 443
+      protocol: TCP
