@@ -1,0 +1,55 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ntfy-allow-ingress-from-tailscale
+  namespace: notify
+spec:
+  podSelector:
+    matchLabels:
+      app: ntfy
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: tailscale
+      ports:
+        - protocol: TCP
+          port: 80
+---
+# CiliumNetworkPolicy for upstream egress to ntfy.sh.
+#
+# The DNS trap: toFQDNs populates only if Cilium's L7 DNS proxy observes the
+# lookups, so the kube-dns rules.dns block MUST live inside this same
+# CiliumNetworkPolicy — the namespace allow-dns plain netpol is invisible to
+# the proxy. matchPattern: "*" is deliberate (an engaged L7 DNS rule REFUSES
+# any name outside the allowlist).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: ntfy-upstream-egress
+  namespace: notify
+spec:
+  endpointSelector:
+    matchLabels:
+      app: ntfy
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s-app: kube-dns
+            io.kubernetes.pod.namespace: kube-system
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+          rules:
+            dns:
+              - matchPattern: "*"
+    - toFQDNs:
+        - matchName: "ntfy.sh"
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP

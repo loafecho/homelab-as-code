@@ -1,0 +1,18 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ntfy
+  namespace: notify
+  # TAILNET-ONLY: the phone must be on the tailnet to receive alerts.
+  # Funnel (public exposure) is deliberately omitted; it can be enabled later
+  # with a single annotation if needed.
+spec:
+  ingressClassName: tailscale
+  defaultBackend:
+    service:
+      name: ntfy
+      port:
+        number: 80
+  tls:
+    - hosts:
+        - ntfy

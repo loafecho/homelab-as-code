@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ntfy-config
+  namespace: notify
+data:
+  server.yml: |
+    # behind-proxy: The Tailscale ingress terminates TLS; the pod sees plain HTTP.
+    # upstream-base-url: iOS cannot hold background sockets, so ntfy must forward
+    #   a content-free wake-up poll to ntfy.sh to trigger APNs; the phone then
+    #   fetches the real message directly from our server.
+    # auth-default-access: deny-all — defence-in-depth: even though the endpoint
+    #   is tailnet-only, require explicit per-topic ACL entries for access.
+    # web-root: disable — no web UI; this is a pure API endpoint consumed by the
+    #   phone and automated publishers.
+    base-url: "https://ntfy.example.com"   # the tailnet ingress name
+    listen-http: ":80"
+    behind-proxy: true
+    cache-file: "/var/lib/ntfy/cache.db"
+    cache-duration: "12h"
+    auth-file: "/var/lib/ntfy/user.db"
+    auth-default-access: "deny-all"
+    upstream-base-url: "https://ntfy.sh"
+    enable-signup: false
+    enable-login: false
+    enable-reservations: false
+    web-root: "disable"
+    auth-access:
+      - "phone:alerts:ro"
+      - "publisher:alerts:wo"
+      # approval requests: the phone only reads, the automation only writes.
+      - "phone:approvals:ro"
+      - "publisher:approvals:wo"
+    visitor-request-limit-burst: 30
+    visitor-request-limit-replenish: "10s"
+    visitor-subscription-limit: 10
+    visitor-message-daily-limit: 500

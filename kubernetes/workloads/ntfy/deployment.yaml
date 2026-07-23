@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ntfy
+  namespace: notify
+  labels:
+    app: ntfy
+spec:
+  replicas: 1
+  # Recreate strategy required because the PVC is ReadWriteOnce and cannot be
+  # shared across pods during a rolling update.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: ntfy
+  template:
+    metadata:
+      labels:
+        app: ntfy
+    spec:
+      enableServiceLinks: false
+      containers:
+        - name: ntfy
+          image: binwiederhier/ntfy@sha256:97dadc752c23fcd75ee23609dc4d552dea0f98d062adcdf60942ca30974902ad # v2.26.3 amd64, pinned by digest
+          args: ["serve"]
+          ports:
+            - containerPort: 80
+          env:
+            - name: NTFY_AUTH_USERS
+              valueFrom:
+                secretKeyRef:
+                  name: ntfy
+                  key: NTFY_AUTH_USERS
+            - name: NTFY_AUTH_TOKENS
+              valueFrom:
+                secretKeyRef:
+                  name: ntfy
+                  key: NTFY_AUTH_TOKENS
+          volumeMounts:
+            - name: config
+              mountPath: /etc/ntfy
+            - name: data
+              mountPath: /var/lib/ntfy
+          readinessProbe:
+            httpGet:
+              path: /v1/health
+              port: 80
+          livenessProbe:
+            httpGet:
+              path: /v1/health
+              port: 80
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: config
+          configMap:
+            name: ntfy-config
+        - name: data
+          persistentVolumeClaim:
+            claimName: ntfy-data
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ntfy-data
+  namespace: notify
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi
