@@ -1,0 +1,17 @@
+# /etc/pve/firewall/101.fw  (vault, zone=secrets)
+# GENERATED — edit host_vars/vault.yml, never this file.
+[OPTIONS]
+enable: 1
+policy_in: DROP
+policy_out: DROP
+# established/related replies auto-accepted by conntrack
+
+[RULES]
+IN ACCEPT -source 192.0.2.50 -p tcp -dport 22 # T1 break-glass SSH
+IN ACCEPT -source 192.0.2.51 -p tcp -dport 22 # T1 break-glass SSH
+IN ACCEPT -source 192.0.2.100 -p tcp -dport 22 # Ansible control
+IN ACCEPT -source 192.0.2.100 -p tcp -dport 443 # secret fetch via the Caddy TLS front (roles/vault_caddy_tls)
+IN ACCEPT -source 192.0.2.115 -p tcp -dport 443 # secret fetch via the Caddy TLS front (roles/vault_caddy_tls)
+IN ACCEPT -source 192.0.2.112 -p tcp -dport 443 # secret fetch via the Caddy TLS front (roles/vault_caddy_tls)
+IN ACCEPT -source 192.0.2.190 -p tcp -dport 443 # uptime probe
+OUT ACCEPT -dest 192.0.2.115 -p tcp -dport 3025 # tbot -> Teleport auth for Caddy TLS cert renewal. Cert plumbing only, never in the secret-fetch path

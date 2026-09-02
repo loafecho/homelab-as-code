@@ -1,0 +1,22 @@
+{
+	# No public ACME: this is a LAN-only name/IP behind a Teleport `db`-CA
+	# leaf cert, not a publicly trusted CA — auto_https would otherwise try
+	# (and fail) to obtain a Let's Encrypt cert for it.
+	auto_https off
+	admin off
+}
+
+:443 {
+	tls /etc/caddy/tls/tlscert.pem /etc/caddy/tls/key.pem
+
+	# Infisical is bare HTTP on 127.0.0.1:80 today
+	# (docker maps 0.0.0.0:80->8080 on the vault VM). Caddy should be the ONLY
+	# consumer of that port — host_vars/vault.yml's policy_in DROP with no :80
+	# ingress rule already enforces that nothing else on the LAN can reach it.
+	reverse_proxy 127.0.0.1:80
+
+	log {
+		output file /var/log/caddy/vault-access.log
+		format json
+	}
+}

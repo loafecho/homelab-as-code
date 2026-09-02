@@ -1,0 +1,13 @@
+# /etc/pve/firewall/130.fw  (kube, zone=cluster)
+# GENERATED — edit host_vars/kube.yml, never this file.
+[OPTIONS]
+enable: 1
+policy_in: DROP
+policy_out: ACCEPT
+# established/related replies auto-accepted by conntrack
+
+[RULES]
+IN ACCEPT -source 192.0.2.50 -p tcp -dport 22 # T1 break-glass SSH
+IN ACCEPT -source 192.0.2.51 -p tcp -dport 22 # T1 break-glass SSH
+IN ACCEPT -source 192.0.2.100 -p tcp -dport 22 # Ansible control
+IN ACCEPT -source 192.0.2.100 -p tcp -dport 6443 # kubectl/helm/Argo CLI from the control node, the ONLY allowed path to the API server
