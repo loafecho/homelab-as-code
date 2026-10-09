@@ -1,0 +1,102 @@
+# Ingress: only the tailscale proxies (and the UI -> API hop). Egress: the API is a general-purpose browser, so it
+# may reach the public internet on 80/443 -- but NOT the LAN, the tailnet or link-local (deliberate; a page cannot
+# drive it into the homelab). The DNS rule must live inside this CiliumNetworkPolicy: Cilium's L7 DNS proxy only
+# sees lookups allowed by a rule in the same policy (see workloads/ntfy/netpol.yaml).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: steel-api-ingress
+  namespace: apps
+spec:
+  podSelector:
+    matchLabels: {app: steel-browser-api}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: tailscale}
+        - podSelector:
+            matchLabels: {app: steel-browser-ui}
+      ports:
+        - {protocol: TCP, port: 3080}   # the host-shim sidecar; the API's own :3000 is only reachable in-pod
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: steel-ui-ingress-egress
+  namespace: apps
+spec:
+  podSelector:
+    matchLabels: {app: steel-browser-ui}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: tailscale}
+      ports:
+        - {protocol: TCP, port: 80}
+  egress:
+    - to:
+        - podSelector:
+            matchLabels: {app: steel-browser-api}
+      ports:
+        - {protocol: TCP, port: 3080}
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: steel-api-egress
+  namespace: apps
+spec:
+  endpointSelector:
+    matchLabels: {app: steel-browser-api}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s-app: kube-dns
+            io.kubernetes.pod.namespace: kube-system
+      toPorts:
+        - ports:
+            - {port: "53", protocol: UDP}
+            - {port: "53", protocol: TCP}
+          rules:
+            dns:
+              - matchPattern: "*"
+    # Public IPv4 only: 0.0.0.0/0 minus 10/8, 192.168/16 and the CGNAT/tailnet
+    # range, written out as its complement (Python ipaddress.address_exclude),
+    # with 172.16/12 and link-local as excepts.
+    - toCIDRSet:
+        - cidr: 0.0.0.0/5
+        - cidr: 8.0.0.0/7
+        - cidr: 11.0.0.0/8
+        - cidr: 12.0.0.0/6
+        - cidr: 16.0.0.0/4
+        - cidr: 32.0.0.0/3
+        - cidr: 64.0.0.0/3
+        - cidr: 96.0.0.0/6
+        - cidr: 100.0.0.0/10
+        - cidr: 100.128.0.0/9
+        - cidr: 101.0.0.0/8
+        - cidr: 102.0.0.0/7
+        - cidr: 104.0.0.0/5
+        - cidr: 112.0.0.0/4
+        - cidr: 128.0.0.0/2
+          except: [172.16.0.0/12, 169.254.0.0/16]
+        - cidr: 192.0.0.0/9
+        - cidr: 192.128.0.0/11
+        - cidr: 192.160.0.0/13
+        - cidr: 192.169.0.0/16
+        - cidr: 192.170.0.0/15
+        - cidr: 192.172.0.0/14
+        - cidr: 192.176.0.0/12
+        - cidr: 192.192.0.0/10
+        - cidr: 193.0.0.0/8
+        - cidr: 194.0.0.0/7
+        - cidr: 196.0.0.0/6
+        - cidr: 200.0.0.0/5
+        - cidr: 208.0.0.0/4
+        - cidr: 224.0.0.0/3
+      toPorts:
+        - ports:
+            - {port: "80", protocol: TCP}
+            - {port: "443", protocol: TCP}

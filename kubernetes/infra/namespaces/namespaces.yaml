@@ -23,3 +23,19 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: tailscale
+---
+# Node telemetry: an Alloy DaemonSet pushing metrics to Prometheus outside the cluster.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: telemetry
+  labels:
+    zone: telemetry
+---
+# Portainer agent, so a Portainer server elsewhere can manage this cluster.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: portainer
+  labels:
+    zone: portainer

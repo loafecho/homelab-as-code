@@ -1,0 +1,24 @@
+# Exposed on the tailnet only (tailscale LoadBalancer, tag:k8s) as portainer-agent-kube:9001.
+# The tailnet ACL lets only the Portainer server's tag reach tag:k8s:9001.
+apiVersion: v1
+kind: Service
+metadata:
+  name: portainer-agent
+  namespace: portainer
+  annotations:
+    tailscale.com/hostname: portainer-agent-kube
+spec:
+  type: LoadBalancer
+  loadBalancerClass: tailscale
+  selector: {app: portainer-agent}
+  ports:
+    - {name: http, protocol: TCP, port: 9001, targetPort: 9001}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: portainer-agent-headless
+  namespace: portainer
+spec:
+  clusterIP: None
+  selector: {app: portainer-agent}

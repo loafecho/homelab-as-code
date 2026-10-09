@@ -1,0 +1,157 @@
+# steel-browser (open-source browser API + live view). Automation scripts connect over CDP to
+# wss://steel.example.com/ (the tailnet ingress name). Tailnet-only.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: steel-browser-api
+  namespace: apps
+  labels: {app: steel-browser-api}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}   # RWO logs volume; one browser host
+  selector:
+    matchLabels: {app: steel-browser-api}
+  template:
+    metadata:
+      labels: {app: steel-browser-api}
+    spec:
+      enableServiceLinks: false
+      initContainers:
+        # A restarted pod has a new hostname; Chrome refuses a profile whose Singleton lock names another host.
+        - name: clear-chrome-locks
+          image: caddy@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648 # caddy:2-alpine
+          command: ["sh", "-c", "rm -f /data/chrome-profile/SingletonLock /data/chrome-profile/SingletonSocket /data/chrome-profile/SingletonCookie"]
+          volumeMounts:
+            - {name: chrome-profile, mountPath: /data/chrome-profile}
+          resources:
+            requests: {cpu: 10m, memory: 16Mi}
+            limits: {cpu: 100m, memory: 32Mi}
+      containers:
+        - name: api
+          image: ghcr.io/steel-dev/steel-browser-api@sha256:895a1643d008c7c48496268e404a82f91ad25f5b76acd9828499259ea393d27d # pinned by digest
+          ports:
+            - containerPort: 3000
+          env:
+            - {name: DOMAIN, value: steel.example.com}
+            - {name: CDP_DOMAIN, value: steel.example.com}
+            # Tailnet ingress serves https, so the live viewer must use wss:// (ws:// is blocked as mixed content).
+            - {name: USE_SSL, value: "true"}
+            - {name: LOG_STORAGE_ENABLED, value: "true"}
+            - {name: LOG_STORAGE_PATH, value: /data/logs/browser-logs.duckdb}
+            # Chrome profile on a PVC so logins survive pod restarts (the default /tmp/steel-chrome is
+            # wiped by every restart). Steel creates it, never deletes it.
+            - {name: CHROME_USER_DATA_DIR, value: /data/chrome-profile}
+          volumeMounts:
+            - {name: logs, mountPath: /data/logs}
+            - {name: chrome-profile, mountPath: /data/chrome-profile}
+            - {name: exports, mountPath: /tmp/steel-browser-exports}
+            - {name: cache, mountPath: /app/.cache}
+            - {name: shm, mountPath: /dev/shm}   # Chrome needs more than the 64 MB default
+          readinessProbe:
+            tcpSocket: {port: 3000}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket: {port: 3000}
+            initialDelaySeconds: 60
+            periodSeconds: 30
+          resources:
+            # Bounded: left alone, a long-lived browser host grows to several GB of chromium processes.
+            requests: {cpu: 250m, memory: 512Mi}
+            limits: {cpu: "2", memory: 5Gi}   # 3Gi was OOMKilled under repeated large page loads
+        # Host-header shim: Chrome's DevTools socket rejects any Host that is not an IP or localhost
+        # (DNS-rebinding guard), and steel passes the client's Host through. Local clients on
+        # 127.0.0.1:3000 never hit this; through the tailnet ingress the Host is the ingress name.
+        # The ingress/service land on :3080 here, which forwards to the API with Host rewritten.
+        - name: host-shim
+          image: caddy@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648 # caddy:2-alpine
+          ports:
+            - containerPort: 3080
+          volumeMounts:
+            - {name: shim-config, mountPath: /etc/caddy}
+          resources:
+            requests: {cpu: 10m, memory: 16Mi}
+            limits: {cpu: 200m, memory: 96Mi}
+      volumes:
+        - name: shim-config
+          configMap: {name: steel-host-shim}
+        - name: logs
+          persistentVolumeClaim: {claimName: steel-browser-logs}
+        - name: chrome-profile
+          persistentVolumeClaim: {claimName: steel-browser-chrome}
+        - name: exports
+          emptyDir: {}
+        - name: cache
+          emptyDir: {}
+        - name: shm
+          emptyDir: {medium: Memory, sizeLimit: 1Gi}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: steel-host-shim
+  namespace: apps
+data:
+  Caddyfile: |
+    {
+      admin off
+      auto_https off
+    }
+    :3080 {
+      reverse_proxy 127.0.0.1:3000 {
+        header_up Host 127.0.0.1:3000
+      }
+    }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: steel-browser-logs
+  namespace: apps
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path
+  resources:
+    requests: {storage: 2Gi}
+---
+# Saved Chrome profile (cookies = logins). Holds live sessions for whatever is logged in: keep sensitive
+# logins out of it, or log out after use. Not backed up on purpose; a loss just means logging in again.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: steel-browser-chrome
+  namespace: apps
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path
+  resources:
+    requests: {storage: 4Gi}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: steel-browser-ui
+  namespace: apps
+  labels: {app: steel-browser-ui}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: steel-browser-ui}
+  template:
+    metadata:
+      labels: {app: steel-browser-ui}
+    spec:
+      enableServiceLinks: false
+      containers:
+        - name: ui
+          image: ghcr.io/steel-dev/steel-browser-ui@sha256:90927ac0f08a62bbd6c4e4e220cf3f04361c69c06a7307a6c0ba2443b9b9d5e6 # pinned by digest
+          ports:
+            - containerPort: 80
+          env:
+            - {name: API_URL, value: "http://steel-browser-api.apps.svc.cluster.local:3000"}
+          readinessProbe:
+            tcpSocket: {port: 80}
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 10m, memory: 16Mi}
+            limits: {cpu: 200m, memory: 128Mi}

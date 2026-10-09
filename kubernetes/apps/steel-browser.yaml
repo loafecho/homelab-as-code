@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: steel-browser
+  namespace: argocd
+spec:
+  project: cluster
+  source:
+    repoURL: https://github.com/loafecho/homelab-as-code.git
+    targetRevision: main
+    path: kubernetes/workloads/steel-browser
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: apps
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

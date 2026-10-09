@@ -1,0 +1,117 @@
+# Tailnet-only static previews: Caddy serving a PVC. Content is loaded from a
+# workstation by kubernetes/bin/sync-static-sites.sh; Argo owns only the server,
+# not the content. Each site lives at /<name>/ on https://sites.example.com.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: static-sites-caddy
+  namespace: apps
+data:
+  Caddyfile: |
+    {
+      admin off
+      auto_https off
+    }
+    :80 {
+      header X-Robots-Tag "noindex, nofollow, noarchive, nosnippet"
+      handle /robots.txt {
+        respond "User-agent: *
+    Disallow: /" 200
+      }
+      @noslash path_regexp ^/[a-z0-9-]+$
+      redir @noslash {path}/ 308
+      handle {
+        root * /srv
+        file_server browse
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: static-sites
+  namespace: apps
+  labels: {app: static-sites}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app: static-sites}
+  template:
+    metadata:
+      labels: {app: static-sites}
+    spec:
+      enableServiceLinks: false
+      containers:
+        - name: caddy
+          image: caddy@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648 # caddy:2-alpine
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - {name: content, mountPath: /srv}
+            - {name: caddyfile, mountPath: /etc/caddy}
+          readinessProbe:
+            httpGet: {path: /robots.txt, port: 80}
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+          resources:
+            requests: {cpu: 10m, memory: 16Mi}
+            limits: {cpu: 200m, memory: 96Mi}
+      volumes:
+        - name: content
+          persistentVolumeClaim: {claimName: static-sites-content}
+        - name: caddyfile
+          configMap: {name: static-sites-caddy}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: static-sites-content
+  namespace: apps
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path
+  resources:
+    requests: {storage: 1Gi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: static-sites
+  namespace: apps
+spec:
+  selector: {app: static-sites}
+  ports:
+    - {name: http, port: 80, targetPort: 80}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sites
+  namespace: apps
+spec:
+  ingressClassName: tailscale
+  defaultBackend:
+    service:
+      name: static-sites
+      port: {number: 80}
+  tls:
+    - hosts: [sites]
+---
+# Ingress only from the tailscale proxies; no egress at all (namespace default-deny).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: static-sites-ingress
+  namespace: apps
+spec:
+  podSelector:
+    matchLabels: {app: static-sites}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: tailscale}
+      ports:
+        - {protocol: TCP, port: 80}

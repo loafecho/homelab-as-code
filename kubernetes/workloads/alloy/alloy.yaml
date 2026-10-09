@@ -1,0 +1,93 @@
+# Node metrics for the cluster node -> a Prometheus server outside the cluster
+# (remote_write, LAN). Hypervisor memory figures for a balloon-less VM are
+# misleading, so the in-guest numbers come from here. Metrics only, no logs.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alloy-config
+  namespace: telemetry
+data:
+  config.alloy: |
+    prometheus.exporter.unix "node" {
+      procfs_path        = "/host/proc"
+      sysfs_path         = "/host/sys"
+      rootfs_path        = "/host/root"
+      disable_collectors = ["thermal_zone"]
+      filesystem {
+        mount_points_exclude = "^/(dev|proc|run|sys|var/lib/kubelet/.+|var/lib/containerd/.+|run/containerd/.+)($|/)"
+      }
+    }
+    prometheus.scrape "node" {
+      targets         = prometheus.exporter.unix.node.targets
+      scrape_interval = "15s"
+      forward_to      = [prometheus.remote_write.telemetry.receiver]
+    }
+    prometheus.remote_write "telemetry" {
+      endpoint {
+        url = "http://192.0.2.129:9090/api/v1/write"
+      }
+      external_labels = {
+        host = "kube",
+        env  = "homelab",
+      }
+    }
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: alloy
+  namespace: telemetry
+  labels: {app.kubernetes.io/name: alloy}
+spec:
+  selector:
+    matchLabels: {app.kubernetes.io/name: alloy}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: alloy}
+    spec:
+      enableServiceLinks: false
+      tolerations:
+        - {key: node-role.kubernetes.io/control-plane, operator: Exists, effect: NoSchedule}
+      containers:
+        - name: alloy
+          image: grafana/alloy@sha256:2aa2099af76c0098d4af7a4d6e48f86cb66dc1a000222ad927a1c67c6542d13f # v1.20.1, pinned by digest
+          args: ["run", "/etc/alloy/config.alloy", "--storage.path=/tmp/alloy", "--server.http.listen-addr=127.0.0.1:12345"]
+          securityContext:
+            runAsUser: 0
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+          resources:
+            requests: {cpu: 50m, memory: 96Mi}
+            limits: {cpu: 300m, memory: 256Mi}
+          volumeMounts:
+            - {name: config, mountPath: /etc/alloy}
+            - {name: proc, mountPath: /host/proc, readOnly: true}
+            - {name: sys, mountPath: /host/sys, readOnly: true}
+            - {name: root, mountPath: /host/root, readOnly: true, mountPropagation: HostToContainer}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: config
+          configMap: {name: alloy-config}
+        - name: proc
+          hostPath: {path: /proc}
+        - name: sys
+          hostPath: {path: /sys}
+        - name: root
+          hostPath: {path: /}
+        - name: tmp
+          emptyDir: {}
+---
+# Egress: only the Prometheus host, by IP (no DNS needed). Ingress: none.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: alloy-egress
+  namespace: telemetry
+spec:
+  endpointSelector:
+    matchLabels: {app.kubernetes.io/name: alloy}
+  egress:
+    - toCIDR: [192.0.2.129/32]
+      toPorts:
+        - ports:
+            - {port: "9090", protocol: TCP}

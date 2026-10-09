@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: alloy
+  namespace: argocd
+spec:
+  project: cluster
+  source:
+    repoURL: https://github.com/loafecho/homelab-as-code.git
+    targetRevision: main
+    path: kubernetes/workloads/alloy
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: telemetry
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
