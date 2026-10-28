@@ -1,0 +1,194 @@
+{
+ "captured": "2026-10-28T00:28:15+00:00",
+ "get": {
+  "/cluster/resources?type=vm": [
+   {
+    "cpu": 0,
+    "disk": 0,
+    "diskread": 0,
+    "diskwrite": 0,
+    "id": "lxc/102",
+    "maxcpu": 2,
+    "maxdisk": 17179869184,
+    "maxmem": 2147483648,
+    "mem": 0,
+    "memhost": 0,
+    "name": "worker",
+    "netin": 0,
+    "netout": 0,
+    "node": "hypervisor",
+    "pool": "pilot",
+    "status": "stopped",
+    "template": 0,
+    "type": "lxc",
+    "uptime": 0,
+    "vmid": 102
+   }
+  ],
+  "/nodes": [
+   {
+    "cpu": 0.635878355259761,
+    "disk": 31682953216,
+    "id": "node/hypervisor",
+    "level": "",
+    "maxcpu": 20,
+    "maxdisk": 72722055168,
+    "maxmem": 101157568512,
+    "mem": 74969423872,
+    "node": "hypervisor",
+    "status": "online",
+    "type": "node",
+    "uptime": 4431361
+   }
+  ],
+  "/nodes/hypervisor/lxc/102/config": {
+   "arch": "amd64",
+   "cores": 2,
+   "digest": "eefc4d1bf75ca0bc7fdbc30c5a50cfddf14c8854",
+   "features": "nesting=1",
+   "hostname": "worker",
+   "memory": 2048,
+   "nameserver": "192.0.2.1",
+   "net0": "name=eth0,bridge=vmbr0,hwaddr=@MAC@,ip=dhcp,type=veth",
+   "onboot": 0,
+   "ostype": "debian",
+   "rootfs": "local-lvm:vm-102-disk-0,size=16G",
+   "searchdomain": "lan",
+   "swap": 512,
+   "unprivileged": 1
+  },
+  "/nodes/hypervisor/lxc/102/status/current": {
+   "cpu": 0,
+   "cpus": 2,
+   "disk": 0,
+   "diskread": 0,
+   "diskwrite": 0,
+   "ha": {
+    "managed": 0
+   },
+   "maxdisk": 17179869184,
+   "maxmem": 2147483648,
+   "maxswap": 536870912,
+   "mem": 0,
+   "name": "worker",
+   "netin": 0,
+   "netout": 0,
+   "status": "stopped",
+   "swap": 0,
+   "type": "lxc",
+   "uptime": 0,
+   "vmid": 102
+  },
+  "/nodes/hypervisor/storage": [
+   {
+    "active": 1,
+    "avail": 357868929182,
+    "content": "images,rootdir",
+    "enabled": 1,
+    "shared": 0,
+    "storage": "local-lvm",
+    "total": 932678991872,
+    "type": "lvmthin",
+    "used": 574810062690,
+    "used_fraction": 0.616299999999235
+   },
+   {
+    "active": 1,
+    "avail": 478025363456,
+    "content": "backup,rootdir,images",
+    "enabled": 1,
+    "shared": 0,
+    "storage": "backup",
+    "total": 1967846068224,
+    "type": "dir",
+    "used": 1389784035328,
+    "used_fraction": 0.706246315588238
+   },
+   {
+    "active": 1,
+    "avail": 37289766912,
+    "content": "iso,images,import,vztmpl,backup,rootdir,snippets",
+    "enabled": 1,
+    "shared": 0,
+    "storage": "local",
+    "total": 72722055168,
+    "type": "dir",
+    "used": 31691390976,
+    "used_fraction": 0.435787889970761
+   }
+  ],
+  "/pools": [
+   {
+    "comment": "OpenTofu pilot pool",
+    "poolid": "pilot"
+   }
+  ],
+  "/pools/pilot": {
+   "comment": "OpenTofu pilot pool",
+   "members": [
+    {
+     "cpu": 0,
+     "disk": 0,
+     "diskread": 0,
+     "diskwrite": 0,
+     "id": "lxc/102",
+     "maxcpu": 2,
+     "maxdisk": 17179869184,
+     "maxmem": 2147483648,
+     "mem": 0,
+     "memhost": 0,
+     "name": "worker",
+     "netin": 0,
+     "netout": 0,
+     "node": "hypervisor",
+     "pool": "pilot",
+     "status": "stopped",
+     "template": 0,
+     "type": "lxc",
+     "uptime": 0,
+     "vmid": 102
+    }
+   ],
+   "poolid": "pilot"
+  },
+  "/pools?poolid=pilot": [
+   {
+    "comment": "OpenTofu pilot pool",
+    "members": [
+     {
+      "cpu": 0,
+      "disk": 0,
+      "diskread": 0,
+      "diskwrite": 0,
+      "id": "lxc/102",
+      "maxcpu": 2,
+      "maxdisk": 17179869184,
+      "maxmem": 2147483648,
+      "mem": 0,
+      "memhost": 0,
+      "name": "worker",
+      "netin": 0,
+      "netout": 0,
+      "node": "hypervisor",
+      "pool": "pilot",
+      "status": "stopped",
+      "template": 0,
+      "type": "lxc",
+      "uptime": 0,
+      "vmid": 102
+     }
+    ],
+    "poolid": "pilot"
+   }
+  ],
+  "/version": {
+   "release": "9.2",
+   "repoid": "b9984c6d90a4bd80",
+   "version": "9.2.2"
+  }
+ },
+ "simulated": [
+  "CT 102 is a member of pool pilot (/pools/pilot, /pools?poolid=pilot, /cluster/resources)"
+ ],
+ "source": "pvesh get as root on the hypervisor (scripts/smoke/capture-replay.sh)"
+}

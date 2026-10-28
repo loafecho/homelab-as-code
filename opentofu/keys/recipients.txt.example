@@ -1,0 +1,6 @@
+# One age recipient per line. new-state-key.sh refuses to run while any line
+# still says PLACEHOLDER, or with fewer than two recipients.
+# YubiKey (age-plugin-yubikey, PIV slot):
+PLACEHOLDER-age1yubikey-recipient
+# Offline paper backup (age-keygen):
+PLACEHOLDER-age1-paper-recipient

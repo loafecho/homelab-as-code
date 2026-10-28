@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# fleet — OpenTofu on the deploy box with one YubiKey unlock per command. Run
+# it in YOUR terminal (the PIN needs your keyboard):
+#
+#   ssh -t deploy@deploy-box 'opentofu/scripts/fleet plan'
+#
+#   fleet init          tofu init; refuses if the lock file would change
+#   fleet plan [args]   tofu plan, saved to fleet.tfplan. Read it before applying
+#   fleet apply         applies fleet.tfplan exactly as planned, then deletes it;
+#                       refuses when there is no saved plan
+#   fleet state ...     tofu state list / show ...
+#
+# tofu asks the state-key provider 2-4 times per command, and each ask would be
+# a YubiKey PIN/touch. fleet unwraps the state key once and, for plan, the
+# Proxmox token (keys/pve-token.age) right after it: usually one PIN, two at
+# worst. Both reach tofu through the environment, never the screen or the disk.
+# The saved plan holds the token, so apply needs no token unwrap; the plan is
+# encrypted with the state key, like the state. Everything printed is also
+# appended to fleet.log.
+#
+# Rehearse it without the YubiKey, the token or Proxmox: scripts/smoke/fleet-smoke.sh.
+#   FLEET_PVE_ENDPOINT  Proxmox API (default https://hypervisor:8006/; the
+#                       smoke test points it at a fake)
+set -uo pipefail
+cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." || exit 1
+exec > >(tee -a fleet.log) 2>&1
+tee_pid=$!
+# At exit, let tee print the last lines first: the terminal hangs up when this
+# script ends, which can kill tee mid-copy (seen: the final FAIL line lost).
+trap 'exec >&- 2>&-; wait "$tee_pid"' EXIT
+
+fail() { echo "FAIL: $*"; exit 1; }
+# shellcheck source-path=SCRIPTDIR source=lib/unlock.sh
+. scripts/lib/unlock.sh
+
+cmd=${1:-}
+[ $# -gt 0 ] && shift
+case "$cmd" in
+  init|plan|apply|state) ;;
+  *) echo "usage: fleet init | plan [tofu plan args] | apply | state list|show ..."; exit 2 ;;
+esac
+echo "=== fleet $cmd ($(date '+%F %T'))"
+if [ "$cmd" = apply ]; then
+  [ $# -eq 0 ] || fail "fleet apply takes no arguments: it applies fleet.tfplan exactly as planned"
+  [ -s fleet.tfplan ] || fail "no saved plan: run 'fleet plan' first, read it, then 'fleet apply'"
+fi
+require_tty
+export TF_VAR_pve_endpoint=${FLEET_PVE_ENDPOINT:-https://hypervisor:8006/}
+
+unlock_state_key
+if [ "$cmd" = plan ]; then
+  [ -s keys/pve-token.age ] || fail "keys/pve-token.age missing"
+  unlock_token keys/pve-token.age
+fi
+
+case "$cmd" in
+  init)  tofu init -input=false -no-color -lockfile=readonly ;;
+  plan)  tofu plan -input=false -no-color -out=fleet.tfplan "$@" ;;
+  apply) tofu apply -input=false -no-color fleet.tfplan && rm -f fleet.tfplan ;;
+  state) tofu state "$@" ;;
+esac
+rc=$?
+[ "$cmd" = plan ] && [ "$rc" -eq 0 ] && echo ">>> Saved to fleet.tfplan. If the plan above is what you expect: fleet apply"
+exit "$rc"

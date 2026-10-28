@@ -1,0 +1,7 @@
+# Copy to terraform.tfvars (gitignored) or export as TF_VAR_* variables.
+# The API token is NOT set here: scripts/fleet decrypts keys/pve-token.age into
+# TF_VAR_pve_api_token for the one command that needs it.
+pve_endpoint = "https://hypervisor.example.com:8006/"
+node_name    = "hypervisor"
+pool_id      = "pilot"
+dns_server   = "192.0.2.1"
