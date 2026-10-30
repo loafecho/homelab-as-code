@@ -21,6 +21,8 @@
 # Rehearse it without the YubiKey, the token or Proxmox: scripts/smoke/fleet-smoke.sh.
 #   FLEET_PVE_ENDPOINT  Proxmox API (default https://hypervisor:8006/; the
 #                       smoke test points it at a fake)
+#   FLEET_PVE_CA        PEM CA that signs the Proxmox API certificate (default
+#                       keys/pve-root-ca.pem); plan/apply refuse to run without it
 set -uo pipefail
 cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." || exit 1
 exec > >(tee -a fleet.log) 2>&1
@@ -45,6 +47,19 @@ if [ "$cmd" = apply ]; then
   [ -s fleet.tfplan ] || fail "no saved plan: run 'fleet plan' first, read it, then 'fleet apply'"
 fi
 require_tty
+# The Proxmox token rides the TLS connection to TF_VAR_pve_endpoint, so plan and
+# apply verify it against a pinned CA and never skip verification: copy the
+# hypervisor's /etc/pve/pve-root-ca.pem (public, not a secret) to
+# keys/pve-root-ca.pem, or point FLEET_PVE_CA at it. Checked before any unwrap.
+if [ "$cmd" = plan ] || [ "$cmd" = apply ]; then
+  pve_ca=${FLEET_PVE_CA:-keys/pve-root-ca.pem}
+  [ -s "$pve_ca" ] || fail "pinned Proxmox CA $pve_ca missing: copy /etc/pve/pve-root-ca.pem from the hypervisor (keys/README.md)"
+  if [ -n "${TF_VAR_pve_insecure+set}" ] && [ "$TF_VAR_pve_insecure" != false ]; then
+    fail "TF_VAR_pve_insecure must stay false: TLS to Proxmox is verified against the pinned CA"
+  fi
+  SSL_CERT_FILE=$(readlink -f -- "$pve_ca")
+  export SSL_CERT_FILE TF_VAR_pve_insecure=false
+fi
 export TF_VAR_pve_endpoint=${FLEET_PVE_ENDPOINT:-https://hypervisor:8006/}
 
 unlock_state_key

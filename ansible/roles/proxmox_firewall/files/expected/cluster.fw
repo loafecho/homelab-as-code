@@ -8,6 +8,15 @@ enable: 1
 policy_in: DROP
 policy_out: ACCEPT
 
+[IPSET management]
+# PVE's built-in management rules (8006, 22, 5900-5999, 3128) admit this set;
+# without it they fall back to local_network, i.e. the whole LAN. Members are
+# ONLY admin_devices plus the control node (pct_remote and the guest-config
+# comparator SSH to the hypervisor). Never lan_cidr.
+192.0.2.50 # admin-laptop
+192.0.2.51 # admin-workstation
+192.0.2.100 # control (control node)
+
 [RULES]
 # T2 out-of-band: admin_devices -> hypervisor:8006 (noVNC console)
 IN ACCEPT -source 192.0.2.50 -p tcp -dport 8006 # T2 noVNC OOB (admin-laptop)

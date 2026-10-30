@@ -10,9 +10,14 @@ variable "pve_api_token" {
 }
 
 variable "pve_insecure" {
-  description = "Skip TLS verification (the default PVE certificate is self-signed)"
+  description = "Skip TLS verification of the Proxmox API. Must stay false: the API token rides this connection. Trust the PVE CA through SSL_CERT_FILE instead (scripts/fleet pins keys/pve-root-ca.pem)"
   type        = bool
-  default     = true
+  default     = false
+
+  validation {
+    condition     = var.pve_insecure == false
+    error_message = "pve_insecure = true would send the Proxmox API token to an unverified peer. Pin the PVE CA (SSL_CERT_FILE) instead."
+  }
 }
 
 variable "node_name" {

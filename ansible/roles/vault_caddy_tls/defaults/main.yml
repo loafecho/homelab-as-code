@@ -56,3 +56,14 @@ teleport_bot_name: vault-caddy-tls
 # so tbot's `database` output has a target to sign against. Created out of
 # band with `tctl` during the live rollout (see README.md) — not in this repo.
 teleport_db_resource_name: vault-tls-front
+
+# tbot release integrity. The control node caches the release tarball in an
+# operator-owned 0700 directory (never the shared /tmp, where another local
+# user could pre-plant a file that get_url would accept as-is), and get_url
+# verifies it against this digest on every run, replacing or rejecting a file
+# that does not match. No digest is committed: Teleport publishes no .sha256
+# for the tarball URL pinned in tasks/deploy.yml, so the rollout refuses to
+# run until you set the verified SHA-256 of that exact file
+# (-e vault_caddy_tls_tbot_sha256=<64 hex chars>).
+vault_caddy_tls_tbot_sha256: ""
+vault_caddy_tls_tbot_cache_dir: "{{ lookup('ansible.builtin.env', 'HOME') }}/.cache/vault_caddy_tls"

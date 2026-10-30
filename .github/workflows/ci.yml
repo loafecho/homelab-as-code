@@ -34,6 +34,10 @@ jobs:
           for pb in playbooks/*.yml; do ansible-playbook "$pb" --syntax-check; done
       - name: forbid check_mode false
         run: ./scripts/lint-no-check-mode-false.sh
+      - name: controller-only tasks (Proxmox API delegated to localhost, get_url checksummed)
+        run: python3 scripts/lint-controller-tasks.py
+      - name: Tailscale ACL validator regression tests
+        run: python3 scripts/tests/test-validate-acl.py
       - name: render firewall / Caddy / ACL and diff against baselines
         run: ./scripts/check-renders.sh
       - name: guest-config comparator tests
@@ -64,6 +68,8 @@ jobs:
       - name: Install age
         run: sudo apt-get update && sudo apt-get install -y age
       - run: tofu fmt -check -recursive
+      - name: Proxmox API TLS stays verified (pve_insecure false, CA pinned)
+        run: bash scripts/lint-pve-tls.sh
       - name: tofu validate
         run: |
           tofu init -backend=false -input=false
@@ -97,3 +103,5 @@ jobs:
         run: |
           pip install pyyaml
           python3 scripts/tests/check-argo-apps.py
+      - name: steel-browser egress stays public-only
+        run: python3 scripts/tests/check-steel-egress.py

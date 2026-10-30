@@ -7,8 +7,11 @@
     msg: "host_config role is a foundation stub; per-host configuration is not implemented yet."
 
 # This is the ONLY task in site.yml that actually connects to each guest.
-# Everything else is controller-side (debug/assert/delegate_to localhost) or
-# skipped in check mode (the proxmox modules), so without it a dead host could
+# Everything else is controller-side (debug/assert, or delegate_to: localhost,
+# which includes the proxmox API modules; those also skip under --check, but
+# skipping is decided after the module and its token arguments have been
+# delivered, so delegation is what keeps the token off the guests; enforced by
+# scripts/lint-controller-tasks.py), so without it a dead host could
 # never surface as unreachable and the drift gate's ERROR state would be
 # unreachable code. ansible.builtin.ping supports check mode and executes
 # remotely even under --check. become: false — reachability needs no

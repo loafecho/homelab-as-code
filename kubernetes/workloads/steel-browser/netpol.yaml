@@ -64,7 +64,10 @@ spec:
               - matchPattern: "*"
     # Public IPv4 only: 0.0.0.0/0 minus 10/8, 192.168/16 and the CGNAT/tailnet
     # range, written out as its complement (Python ipaddress.address_exclude),
-    # with 172.16/12 and link-local as excepts.
+    # with 172.16/12, link-local and the RFC 5737 documentation ranges (the
+    # inventory's lan_cidr is one of them) as excepts.
+    # scripts/tests/check-steel-egress.py fails if this set reaches lan_cidr or
+    # any private, CGNAT, link-local or documentation range.
     - toCIDRSet:
         - cidr: 0.0.0.0/5
         - cidr: 8.0.0.0/7
@@ -83,6 +86,7 @@ spec:
         - cidr: 128.0.0.0/2
           except: [172.16.0.0/12, 169.254.0.0/16]
         - cidr: 192.0.0.0/9
+          except: [192.0.2.0/24]
         - cidr: 192.128.0.0/11
         - cidr: 192.160.0.0/13
         - cidr: 192.169.0.0/16
@@ -93,7 +97,9 @@ spec:
         - cidr: 193.0.0.0/8
         - cidr: 194.0.0.0/7
         - cidr: 196.0.0.0/6
+          except: [198.51.100.0/24]
         - cidr: 200.0.0.0/5
+          except: [203.0.113.0/24]
         - cidr: 208.0.0.0/4
         - cidr: 224.0.0.0/3
       toPorts:

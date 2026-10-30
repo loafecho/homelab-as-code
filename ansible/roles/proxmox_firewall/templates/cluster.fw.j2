@@ -9,6 +9,18 @@ enable: 1
 policy_in: DROP
 policy_out: ACCEPT
 
+[IPSET management]
+# PVE's built-in management rules (8006, 22, 5900-5999, 3128) admit this set;
+# without it they fall back to local_network, i.e. the whole LAN. Members are
+# ONLY admin_devices plus the control node (pct_remote and the guest-config
+# comparator SSH to the hypervisor). Never lan_cidr.
+{% for dev in admin_devices %}
+{{ dev.ip }} # {{ dev.name }}
+{% endfor %}
+{% for gname, g in guests.items() if g.zone == 'control' and g.ip %}
+{{ g.ip }} # {{ gname }} (control node)
+{% endfor %}
+
 [RULES]
 # T2 out-of-band: admin_devices -> {{ proxmox_host.name }}:{{ proxmox_host.mgmt_port }} (noVNC console)
 {% for dev in admin_devices %}

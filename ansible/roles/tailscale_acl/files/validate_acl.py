@@ -9,6 +9,10 @@ Run against the staged roles/tailscale_acl/files/acl.hujson to prove:
      admin ports, tag:monitor gets exactly one narrow grant to control:443,
      and nothing else grants a broader tailnet service mesh.
 
+Only the tagOwners and acls sections are allowed; any other top-level
+section (grants, hosts, ssh, ...) fails, and each rule's src must be exactly
+{tag:admin} or {tag:monitor} with no duplicates.
+
 Exit 0 + prints a summary on success. Exit 1 with a reason on any violation.
 This is a pure lint/test — it never talks to the Tailscale API and never
 mutates the live tailnet ACL.
@@ -19,6 +23,11 @@ import sys
 
 ALLOWED_TAGS = {"tag:admin", "tag:monitor"}
 ADMIN_PORTS = {"*:22", "*:443", "*:8006"}
+# The policy may contain ONLY these top-level sections. Anything else (grants,
+# hosts, ssh, groups, autoApprovers, nodeAttrs, postures, ...) can widen access
+# without touching tagOwners/acls, so an unknown key is a failure, not a pass.
+ALLOWED_TOP_LEVEL = {"tagOwners", "acls"}
+ALLOWED_RULE_KEYS = {"action", "src", "dst"}
 MONITOR_GRANT = {"src": ["tag:monitor"], "dst": ["control:443"]}
 
 
@@ -88,6 +97,13 @@ def main() -> None:
         return
 
     # --- structural checks -------------------------------------------------
+    if not isinstance(policy, dict):
+        fail("policy is not a JSON object")
+    unknown_sections = set(policy) - ALLOWED_TOP_LEVEL
+    if unknown_sections:
+        fail(f"unexpected top-level policy sections (only {sorted(ALLOWED_TOP_LEVEL)} "
+             f"are allowed): {sorted(unknown_sections)}")
+
     tag_owners = policy.get("tagOwners")
     if not isinstance(tag_owners, dict) or not tag_owners:
         fail("tagOwners missing or empty")
@@ -109,9 +125,23 @@ def main() -> None:
             fail(f"acl entry missing src list: {rule!r}")
         if not isinstance(rule.get("dst"), list) or not rule["dst"]:
             fail(f"acl entry missing dst list: {rule!r}")
+        unknown_keys = set(rule) - ALLOWED_RULE_KEYS
+        if unknown_keys:
+            fail(f"acl entry has unexpected keys {sorted(unknown_keys)}: {rule!r}")
+        for field in ("src", "dst"):
+            if not all(isinstance(v, str) for v in rule[field]):
+                fail(f"acl entry {field} must be a list of strings: {rule!r}")
+            if len(set(rule[field])) != len(rule[field]):
+                fail(f"acl entry has duplicate {field} values: {rule!r}")
 
     # --- policy-intent checks (this IS the slimmed admin-plane ACL) --------
-    admin_rules = [r for r in acls if r.get("src") == ["tag:admin"]]
+    # Classify by the SET of sources: every rule must be exactly an admin rule
+    # or exactly a monitor rule. A rule that is neither (mixed or other
+    # sources) is never silently skipped by the checks below.
+    for r in acls:
+        if set(r["src"]) not in ({"tag:admin"}, {"tag:monitor"}):
+            fail(f"acl entry is neither the admin rule nor the monitor rule (src={r['src']}): {r!r}")
+    admin_rules = [r for r in acls if set(r["src"]) == {"tag:admin"}]
     if not admin_rules:
         fail("no tag:admin rule found — admin door missing")
     admin_dsts = set()
@@ -121,7 +151,7 @@ def main() -> None:
     if extra_admin_dsts:
         fail(f"tag:admin grants broader than admin ports: {sorted(extra_admin_dsts)}")
 
-    monitor_rules = [r for r in acls if "tag:monitor" in r.get("src", [])]
+    monitor_rules = [r for r in acls if set(r["src"]) == {"tag:monitor"}]
     if len(monitor_rules) != 1:
         fail(f"expected exactly one tag:monitor rule, found {len(monitor_rules)}")
     mr = monitor_rules[0]

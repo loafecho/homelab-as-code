@@ -19,6 +19,10 @@ tasks:
       - yamllint .
       - cd ansible && ansible-lint
       - ./scripts/lint-no-check-mode-false.sh
+      - python3 scripts/lint-controller-tasks.py
+      - python3 scripts/tests/test-validate-acl.py
+      - python3 scripts/tests/check-steel-egress.py
+      - bash opentofu/scripts/lint-pve-tls.sh
       - >-
         shellcheck -x scripts/*.sh scripts/tests/*.sh scripts/clone-vm/*.sh kubernetes/bin/*.sh
         opentofu/scripts/*.sh opentofu/scripts/fleet opentofu/scripts/lib/*.sh opentofu/scripts/smoke/*.sh

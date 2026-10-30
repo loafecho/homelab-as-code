@@ -14,6 +14,11 @@
 # apply (state: present, update: true). Forbidden by scripts/lint-no-check-mode-false.sh;
 # real drift detection is scripts/check-guest-config.sh.
 
+# Every community.proxmox task here carries delegate_to: localhost. The play
+# targets the guests themselves, so an undelegated module would be shipped to
+# and run on each guest WITH the Proxmox API token in its arguments (even under
+# --check). scripts/lint-controller-tasks.py fails CI on any that lacks it.
+
 - name: "Ensure VM is defined — {{ guest_name }}"
   community.proxmox.proxmox_kvm:
     api_host: "{{ proxmox_api_host }}"
@@ -35,6 +40,7 @@
   # TODO: cloud-init (ciuser/cipassword from the secrets manager, ipconfig0 with
   # the reserved static guest_ip, sshkeys), disk resize to guest_disk_gb.
   register: _vm_define
+  delegate_to: localhost  # API call from the controller; the token never reaches the guest
 
 # TODO: inject cloud-init user-data carrying the short-TTL secrets-agent
 # machine identity; on first boot it rotates to a per-guest identity.
@@ -49,4 +55,5 @@
     node: "{{ proxmox_node }}"
     vmid: "{{ guest_vmid }}"
     state: "{{ guest_state }}"
+  delegate_to: localhost  # API call from the controller; the token never reaches the guest
   when: guest_state in ['started', 'stopped']

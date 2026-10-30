@@ -4,6 +4,8 @@
 #   - Proxmox is fake_pve.py replaying the hypervisor's recorded read-only
 #     answers (replay/worker.json: CT 102 already in pool pilot). It logs every
 #     call and answers 401 to anything but the token.
+#     Its certificate is fleet's pinned CA (FLEET_PVE_CA), so TLS is
+#     verified exactly as against the real hypervisor.
 #   - the YubiKey is a throwaway age key; the state key and the token are
 #     throwaway too, encrypted to it (the real keys/*.age are never copied).
 #   - every age decrypt is counted per fleet run: each is a PIN/touch for the operator.
@@ -40,7 +42,7 @@ printf 'tofu@pve!pilot=%s\n' "$secret" | age -r "$pub" -o "$S/repo/keys/pve-toke
 
 # the fake Proxmox, replaying the recorded hypervisor answers
 openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -days 1 \
-  -subj /CN=127.0.0.1 -keyout "$S/key.pem" -out "$S/cert.pem" 2>/dev/null
+  -subj /CN=127.0.0.1 -addext subjectAltName=IP:127.0.0.1 -keyout "$S/key.pem" -out "$S/cert.pem" 2>/dev/null
 port=$(python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')
 : > "$S/pve.log"
 FAKE_PVE_MAC=$(printf 'BC:24:11:%02X:%02X:%02X' "$((RANDOM % 256))" "$((RANDOM % 256))" "$((RANDOM % 256))") \
@@ -73,7 +75,7 @@ fleet() {
   echo "=== fleet $*"
   rc=0
   HOME="$S/home" PATH="$S/shim:$PATH" FLEET_AGE_IDENTITY=keys/smoke-identity.txt \
-    FLEET_PVE_ENDPOINT="https://127.0.0.1:$port/" \
+    FLEET_PVE_ENDPOINT="https://127.0.0.1:$port/" FLEET_PVE_CA="$S/cert.pem" \
     python3 "$REPO/scripts/smoke/pty_driver.py" "$S" bash "$S/repo/scripts/fleet" "$@" \
     | tr -d '\r' > "$S/out.txt" || rc=$?
   n=$(( $(wc -l < "$S/unwraps.log") - before ))

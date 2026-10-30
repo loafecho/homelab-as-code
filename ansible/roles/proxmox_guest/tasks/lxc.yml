@@ -9,6 +9,11 @@
 # see the tasks/vm.yml header note. NEVER add check_mode: false
 # (it makes --check a live apply); lint enforces this.
 
+# Every community.proxmox task here carries delegate_to: localhost. The play
+# targets the guests themselves, so an undelegated module would be shipped to
+# and run on each guest WITH the Proxmox API token in its arguments (even under
+# --check). scripts/lint-controller-tasks.py fails CI on any that lacks it.
+
 - name: "Ensure CT is defined — {{ guest_name }}"
   community.proxmox.proxmox:
     api_host: "{{ proxmox_api_host }}"
@@ -29,6 +34,7 @@
     onboot: "{{ guest_onboot }}"
     state: present
   register: _ct_define
+  delegate_to: localhost  # API call from the controller; the token never reaches the guest
 
 - name: "Set CT power state for {{ guest_name }}"
   community.proxmox.proxmox:
@@ -39,4 +45,5 @@
     validate_certs: "{{ proxmox_validate_certs }}"
     vmid: "{{ guest_vmid }}"
     state: "{{ guest_state }}"
+  delegate_to: localhost  # API call from the controller; the token never reaches the guest
   when: guest_state in ['started', 'stopped']

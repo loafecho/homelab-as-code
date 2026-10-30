@@ -4,7 +4,7 @@
 # (unchanged) fleet-smoke.sh, and must see it exit non-zero with the expected
 # SMOKE FAIL line(s). A mutation that doesn't apply counts as not caught.
 #
-#   bash scripts/smoke/fleet-smoke-controls.sh   # PASS = "CONTROLS: 8 of 8 caught"
+#   bash scripts/smoke/fleet-smoke-controls.sh   # PASS = "CONTROLS: 9 of 9 caught"
 # shellcheck disable=SC2016  # the $VARs in the mutations are meant literally
 set -uo pipefail
 REPO=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
@@ -67,6 +67,11 @@ control wrong-token scripts/fleet \
 control replay-gap scripts/smoke/replay/worker.json \
   '"/nodes/hypervisor/lxc/102/status/current"' '"/removed-by-control"' \
   "R calls missing from the replay"
+# TLS must really be verified: trusting the system roots instead of the
+# pinned CA must make the fake's self-signed certificate fail the plan.
+control ca-not-pinned scripts/fleet \
+  'SSL_CERT_FILE=$(readlink -f -- "$pve_ca")' 'SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt' \
+  "B first plan is not import-only"
 
 echo "CONTROLS: $caught of $total caught"
 [ "$caught" -eq "$total" ]

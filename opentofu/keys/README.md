@@ -10,6 +10,7 @@ creates on the deploy box:
 | `yubikey-identity.txt` | age-plugin-yubikey identity stub (points at the key's PIV slot) | no; useless without the YubiKey |
 | `state-key.age` | the 32-byte state data key, wrapped to both recipients | no; useless without a recipient |
 | `pve-token.age` | the pool-scoped Proxmox API token, encrypted to both recipients | no; useless without a recipient |
+| `pve-root-ca.pem` | the hypervisor's `/etc/pve/pve-root-ca.pem`; `scripts/fleet` verifies the Proxmox API's TLS against it (`SSL_CERT_FILE`) and refuses to plan or apply without it | no; a public CA certificate |
 
 One-time setup:
 
@@ -22,5 +23,9 @@ One-time setup:
    recipients. It refuses placeholders, fewer than two recipients, or an
    existing key.
 4. Encrypt the API token: `age -R keys/recipients.txt -o keys/pve-token.age`.
+5. Copy the hypervisor's `/etc/pve/pve-root-ca.pem` to `keys/pve-root-ca.pem`
+   over a channel you already trust (e.g. the console), and compare its
+   fingerprint with `openssl x509 -noout -fingerprint -sha256` on both ends.
+   TLS verification is never switched off: `pve_insecure` must stay false.
 
 `recipients.txt.example` shows the expected shape.

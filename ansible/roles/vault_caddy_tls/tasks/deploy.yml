@@ -20,13 +20,35 @@
 # control node and PUSHED to vault over the already-allowed
 # control->vault:22 SSH channel, not fetched by vault itself.
 
-- name: Fetch tbot release tarball to the control node cache (not vault)
-  ansible.builtin.get_url:
-    url: "https://cdn.teleport.dev/tbot-v18.8.3-linux-amd64-bin.tar.gz"
-    dest: "/tmp/tbot-v18.8.3-linux-amd64-bin.tar.gz"
-    mode: "0644"
+- name: Require the tbot tarball SHA-256 (no unverified binary reaches vault)
+  ansible.builtin.assert:
+    that:
+      - vault_caddy_tls_tbot_sha256 is match('^[0-9a-f]{64}$')
+    fail_msg: >-
+      vault_caddy_tls_tbot_sha256 must be the verified SHA-256 of the pinned tbot
+      tarball (64 lowercase hex chars); see defaults/main.yml.
+    quiet: true
   delegate_to: localhost
   run_once: true
+
+- name: Ensure the operator-owned tbot cache dir on the control node (0700, not /tmp)
+  ansible.builtin.file:
+    path: "{{ vault_caddy_tls_tbot_cache_dir }}"
+    state: directory
+    mode: "0700"
+  delegate_to: localhost
+  run_once: true
+  become: false
+
+- name: Fetch tbot release tarball to the control node cache (not vault), checksum-verified
+  ansible.builtin.get_url:
+    url: "https://cdn.teleport.dev/tbot-v18.8.3-linux-amd64-bin.tar.gz"
+    dest: "{{ vault_caddy_tls_tbot_cache_dir }}/tbot-v18.8.3-linux-amd64-bin.tar.gz"
+    checksum: "sha256:{{ vault_caddy_tls_tbot_sha256 }}"
+    mode: "0600"
+  delegate_to: localhost
+  run_once: true
+  become: false
 
 - name: Install Caddy (apt)
   ansible.builtin.apt:
@@ -54,7 +76,7 @@
 
 - name: Push tbot binary from control-node cache to vault
   ansible.builtin.unarchive:
-    src: "/tmp/tbot-v18.8.3-linux-amd64-bin.tar.gz"
+    src: "{{ vault_caddy_tls_tbot_cache_dir }}/tbot-v18.8.3-linux-amd64-bin.tar.gz"
     dest: /usr/local/bin
     remote_src: false
     extra_opts:
