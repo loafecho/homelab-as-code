@@ -1,0 +1,64 @@
+---
+# Taskfile.yml — front door (https://taskfile.dev). `task --list` shows everything.
+#
+# Every task is READ-ONLY or staging-only except `apply`, which refuses to run
+# unless CONFIRM=apply-live is passed, so it can never fire unattended.
+
+version: "3"
+
+tasks:
+  default:
+    desc: List available tasks.
+    cmds:
+      - task --list
+    silent: true
+
+  lint:
+    desc: yamllint, ansible-lint, the check_mode guard, and shellcheck.
+    cmds:
+      - yamllint .
+      - cd ansible && ansible-lint
+      - ./scripts/lint-no-check-mode-false.sh
+      - >-
+        shellcheck -x scripts/*.sh scripts/tests/*.sh scripts/clone-vm/*.sh kubernetes/bin/*.sh
+        opentofu/scripts/*.sh opentofu/scripts/fleet opentofu/scripts/lib/*.sh opentofu/scripts/smoke/*.sh
+
+  syntax-check:
+    desc: Ansible syntax-check of every playbook.
+    dir: ansible
+    cmds:
+      - ansible-playbook site.yml --syntax-check
+      - for pb in playbooks/*.yml; do ansible-playbook "$pb" --syntax-check; done
+
+  renders:
+    desc: Render firewall, Caddy and ACL from the inventory and diff against the baselines.
+    cmds:
+      - ./scripts/check-renders.sh
+
+  test:
+    desc: Offline tests (comparator, Argo tree, OpenTofu smoke + controls).
+    cmds:
+      - ./scripts/tests/test-check-guest-config.sh
+      - python3 scripts/tests/check-argo-apps.py
+      - bash opentofu/scripts/smoke/fleet-smoke.sh
+      - bash opentofu/scripts/smoke/fleet-smoke-controls.sh
+
+  drift-check:
+    desc: >
+      Three-verdict drift gate against the LIVE hypervisor (PASSED / DRIFT / ERROR).
+      Read-only. Needs PROXMOX_API_TOKEN_ID / PROXMOX_API_TOKEN_SECRET in the environment.
+    cmds:
+      - ./scripts/drift-check.sh
+
+  apply:
+    desc: >
+      Run site.yml for real. GATED: refuses unless CONFIRM=apply-live. Review
+      `task drift-check` and `task renders` output first.
+    vars:
+      CONFIRM: '{{.CONFIRM | default ""}}'
+    preconditions:
+      - sh: '[ "{{.CONFIRM}}" = "apply-live" ]'
+        msg: "Refusing to apply: this mutates live infrastructure. Re-run with CONFIRM=apply-live after reviewing drift-check."
+    dir: ansible
+    cmds:
+      - ansible-playbook site.yml

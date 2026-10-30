@@ -1,0 +1,99 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  ansible:
+    name: Ansible (lint, syntax, renders, comparator)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install "ansible-lint==26.4.0" yamllint pyyaml
+          ansible-galaxy collection install -r ansible/requirements.yml
+      - name: yamllint
+        run: yamllint .
+      - name: ansible-lint
+        working-directory: ansible
+        run: ansible-lint
+      - name: syntax-check every playbook
+        working-directory: ansible
+        run: |
+          ansible-playbook site.yml --syntax-check
+          for pb in playbooks/*.yml; do ansible-playbook "$pb" --syntax-check; done
+      - name: forbid check_mode false
+        run: ./scripts/lint-no-check-mode-false.sh
+      - name: render firewall / Caddy / ACL and diff against baselines
+        run: ./scripts/check-renders.sh
+      - name: guest-config comparator tests
+        run: ./scripts/tests/test-check-guest-config.sh
+
+  shellcheck:
+    name: shellcheck
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: shellcheck --version
+      - run: >-
+          shellcheck -x scripts/*.sh scripts/tests/*.sh scripts/clone-vm/*.sh kubernetes/bin/*.sh
+          opentofu/scripts/*.sh opentofu/scripts/fleet opentofu/scripts/lib/*.sh opentofu/scripts/smoke/*.sh
+
+  opentofu:
+    name: OpenTofu (fmt, validate, smoke + controls)
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: opentofu
+    steps:
+      - uses: actions/checkout@v4
+      - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: 1.13.2
+          tofu_wrapper: false
+      - name: Install age
+        run: sudo apt-get update && sudo apt-get install -y age
+      - run: tofu fmt -check -recursive
+      - name: tofu validate
+        run: |
+          tofu init -backend=false -input=false
+          tofu validate
+      - name: smoke test against the fake Proxmox API
+        run: bash scripts/smoke/fleet-smoke.sh
+      - name: controls (every smoke check must be able to fail)
+        run: bash scripts/smoke/fleet-smoke-controls.sh
+
+  kubernetes:
+    name: Kubernetes (kubeconform, Argo tree)
+    runs-on: ubuntu-24.04
+    env:
+      KUBECONFORM_VERSION: v0.7.0
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install kubeconform
+        run: |
+          curl -sSL -o /tmp/kc.tgz "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz"
+          tar -xzf /tmp/kc.tgz -C /tmp kubeconform
+          sudo install /tmp/kubeconform /usr/local/bin/kubeconform
+      - name: kubeconform (core + CRD schemas)
+        run: |
+          kubeconform -strict -summary \
+            -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            -skip InitConfiguration,ClusterConfiguration \
+            -ignore-filename-pattern 'values\.yaml$' \
+            kubernetes/
+      - name: Argo CD app-of-apps structure
+        run: |
+          pip install pyyaml
+          python3 scripts/tests/check-argo-apps.py
