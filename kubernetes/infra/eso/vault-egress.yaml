@@ -11,7 +11,11 @@
 #     name exact vault.example.com vault-egress.external-secrets.svc.cluster.local
 #     answer auto
 #   }
-# ACL side: the cluster's tag needs exactly one grant, to the secrets host on :443.
+# ACL side: exactly one grant, tag:k8s-eso-egress -> the secrets host on :443.
+# This proxy carries its OWN tag (annotation below) because every other operator
+# proxy (the ingress proxies and the portainer-agent LB) keeps the default
+# tag:k8s; a grant keyed on tag:k8s would reach the secrets host from all of
+# them. The policy needs tagOwners "tag:k8s-eso-egress": ["tag:k8s-operator"].
 apiVersion: v1
 kind: Service
 metadata:
@@ -19,6 +23,7 @@ metadata:
   namespace: external-secrets
   annotations:
     tailscale.com/tailnet-fqdn: vault.example.com
+    tailscale.com/tags: tag:k8s-eso-egress
 spec:
   type: ExternalName
   externalName: placeholder

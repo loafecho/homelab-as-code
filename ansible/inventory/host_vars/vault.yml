@@ -1,5 +1,7 @@
 ---
-# vault (VM 101) - Infisical secrets SINK. Initiates nothing.
+# vault (VM 101) - Infisical secrets SINK. Initiates nothing of its own except
+# tailscaled's control/relay sessions (see egress below), which carry the
+# tailnet endpoint the cluster's External Secrets Operator fetches through.
 zone: secrets
 firewall:
   policy_in: DROP
@@ -11,11 +13,26 @@ firewall:
     - { src: "group:secret_consumers", port: 443, proto: tcp, enabled: true,
         comment: "secret fetch via the Caddy TLS front (roles/vault_caddy_tls)" }
     - { src: monitor, port: 443, proto: tcp, enabled: true, comment: "uptime probe" }
-  # policy_out stays DROP. ONE narrow carve-out: tbot (Teleport Machine ID,
+    # Direct WireGuard paths for tailscaled. WireGuard authenticates every
+    # packet with the peer's node key; without this rule peers fall back to DERP.
+    - { src: internet, port: 41641, proto: udp, enabled: true,
+        comment: "tailscaled direct WireGuard (tailscale serve endpoint used by ESO)" }
+  # policy_out stays DROP, with two deliberate carve-outs.
+  # (1) tailscaled: vault serves the secrets API on the tailnet through
+  # `tailscale serve`, and kubernetes/infra/eso/vault-egress.yaml points both
+  # SecretStores at it. tailscaled must open its own sessions to the
+  # coordination server and DERP relays (TCP 443) and STUN (UDP 3478), or
+  # applying policy_out: DROP cuts the ESO path. Destinations are "internet"
+  # because those addresses are provider-operated and change.
+  # (2) tbot (Teleport Machine ID,
   # roles/vault_caddy_tls) runs on vault and must dial OUT to Teleport to join
   # and renew the Caddy TLS leaf cert. always_allow_established only covers
   # return traffic, not a new outbound session, so this rule is required.
   egress:
+    - { dest: internet, port: 443, proto: tcp, enabled: true,
+        comment: "tailscaled -> coordination server + DERP relays (tailnet endpoint for ESO)" }
+    - { dest: internet, port: 3478, proto: udp, enabled: true,
+        comment: "tailscaled -> STUN (NAT discovery for direct WireGuard paths)" }
     - { dest: teleport, port: 3025, proto: tcp, enabled: true,
         comment: "tbot -> Teleport auth for Caddy TLS cert renewal. Cert plumbing only, never in the secret-fetch path" }
   # CUT: the DMZ must NEVER reach vault. Only group:secret_consumers is admitted.

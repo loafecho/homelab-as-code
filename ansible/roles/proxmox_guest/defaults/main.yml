@@ -27,7 +27,13 @@ proxmox_node: "{{ proxmox_host.name }}"
 proxmox_api_user: "{{ lookup('env', 'PROXMOX_API_USER') | default('automation@pve', true) }}"
 proxmox_api_token_id: "{{ lookup('env', 'PROXMOX_API_TOKEN_ID') | default(omit, true) }}"
 proxmox_api_token_secret: "{{ lookup('env', 'PROXMOX_API_TOKEN_SECRET') | default(omit, true) }}"
-proxmox_validate_certs: false
+# The API token rides this connection, so TLS is always verified against the
+# hypervisor's PVE cluster CA (the same public certificate opentofu/scripts/fleet
+# pins under opentofu/keys/; override with PROXMOX_CA_PATH). If it is missing,
+# live Proxmox API calls fail closed; --check runs are unaffected because these
+# modules skip in check mode. scripts/lint-controller-tasks.py enforces both.
+proxmox_validate_certs: true
+proxmox_ca_path: "{{ lookup('env', 'PROXMOX_CA_PATH') | default(role_path ~ '/../../../opentofu/keys/pve-root-ca.pem', true) }}"
 
 # --- Hardware defaults (overridable per host_vars) ---------------------------
 guest_cores: 2

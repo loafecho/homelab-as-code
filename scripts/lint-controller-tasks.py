@@ -10,6 +10,11 @@
 2. Every get_url task must carry a `checksum:` and must not download under
    /tmp or /var/tmp: a fixed path in a shared, world-writable directory with no
    digest accepts whatever file another local user planted there first.
+3. Every community.proxmox.* module task must verify the API's TLS: no literal
+   `validate_certs: false`, and a `ca_path:` must be passed (the hypervisor
+   serves a PVE-CA-signed certificate, so verification needs the pinned CA).
+   The role default `proxmox_validate_certs` must stay true. Without this, the
+   token is handed to whatever answers on :8006.
 
 Offline: parses YAML only. Exit 0 = OK, 1 = violations (listed), 2 = usage.
 """
@@ -20,6 +25,8 @@ import yaml
 
 ANSIBLE_DIR = pathlib.Path(__file__).resolve().parent.parent / "ansible"
 PROXMOX_PREFIX = "community.proxmox."
+FALSE_WORDS = {"false", "no", "off", "0"}
+GUEST_DEFAULTS = "roles/proxmox_guest/defaults/main.yml"
 GET_URL = {"get_url", "ansible.builtin.get_url", "ansible.legacy.get_url"}
 SHARED_TMP = ("/tmp/", "/var/tmp/")
 NESTED = ("block", "rescue", "always")
@@ -40,6 +47,15 @@ def check_task(task, where, localhost_play, problems):
     if any(k.startswith(PROXMOX_PREFIX) for k in modules):
         if not localhost_play and task.get("delegate_to") != "localhost":
             problems.append(f"{where}: '{name}': community.proxmox task without delegate_to: localhost")
+        for k in modules:
+            if not k.startswith(PROXMOX_PREFIX):
+                continue
+            args = task[k] if isinstance(task[k], dict) else {}
+            vc = args.get("validate_certs", True)
+            if vc is False or str(vc).strip().lower() in FALSE_WORDS:
+                problems.append(f"{where}: '{name}': community.proxmox task with validate_certs: false")
+            if not args.get("ca_path"):
+                problems.append(f"{where}: '{name}': community.proxmox task without ca_path: (pinned PVE CA)")
     for k in modules:
         if k in GET_URL:
             args = task[k] if isinstance(task[k], dict) else {}
@@ -78,6 +94,11 @@ def main():
     for sub in ("tasks", "handlers"):
         files += sorted((ANSIBLE_DIR / "roles").glob(f"*/{sub}/*.yml"))
     problems = []
+    defaults = yaml.safe_load((ANSIBLE_DIR / GUEST_DEFAULTS).read_text(encoding="utf-8")) or {}
+    if defaults.get("proxmox_validate_certs") is not True:
+        problems.append(f"{GUEST_DEFAULTS}: proxmox_validate_certs must be true")
+    if not defaults.get("proxmox_ca_path"):
+        problems.append(f"{GUEST_DEFAULTS}: proxmox_ca_path must point at the pinned PVE CA")
     for f in files:
         if f.is_file():
             lint_file(f, problems)
@@ -86,7 +107,7 @@ def main():
         for p in problems:
             print("  " + p)
         sys.exit(1)
-    print(f"lint-controller-tasks: OK ({len(files)} files; community.proxmox delegated, get_url checksummed)")
+    print(f"lint-controller-tasks: OK ({len(files)} files; community.proxmox delegated + TLS-verified, get_url checksummed)")
 
 
 if __name__ == "__main__":

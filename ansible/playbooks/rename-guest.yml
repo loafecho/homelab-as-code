@@ -21,7 +21,9 @@
       api_user: "{{ lookup('env', 'PROXMOX_API_USER') | default('automation@pve', true) }}"
       api_token_id: "{{ lookup('env', 'PROXMOX_API_TOKEN_ID') | default(omit, true) }}"
       api_token_secret: "{{ lookup('env', 'PROXMOX_API_TOKEN_SECRET') | default(omit, true) }}"
-      validate_certs: false
+      # Verified TLS against the pinned PVE CA: the API token rides this call.
+      validate_certs: true
+      ca_path: "{{ lookup('env', 'PROXMOX_CA_PATH') | default(playbook_dir ~ '/../../opentofu/keys/pve-root-ca.pem', true) }}"
       node: "{{ proxmox_host.name }}"
 
   tasks:

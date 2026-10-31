@@ -20,6 +20,14 @@ spec:
           env:
             - {name: LOG_LEVEL, value: INFO}
             - {name: AGENT_CLUSTER_ADDR, value: portainer-agent-headless}
+            # Shared secret with the Portainer server (same AGENT_SECRET in the
+            # server's env). Without it the agent trusts whichever server key it
+            # sees first, while holding cluster-admin. The Secret is created out
+            # of band, never in git. Not optional: a missing Secret holds the
+            # new pod in CreateContainerConfigError and the old pod keeps serving.
+            - name: AGENT_SECRET
+              valueFrom:
+                secretKeyRef: {name: portainer-agent-secret, key: AGENT_SECRET}
             - name: KUBERNETES_POD_IP
               valueFrom:
                 fieldRef: {fieldPath: status.podIP}

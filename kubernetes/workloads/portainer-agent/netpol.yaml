@@ -1,4 +1,5 @@
-# Ingress: only the tailscale proxy, on 9001. Egress: DNS + the kube API, nothing else (no LAN, no tailnet, no internet).
+# Ingress: only this Service's own tailscale LB proxy pod, on 9001 (not every proxy in ns tailscale).
+# Egress: DNS + the kube API, nothing else (no LAN, no tailnet, no internet).
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -12,6 +13,11 @@ spec:
     - from:
         - namespaceSelector:
             matchLabels: {kubernetes.io/metadata.name: tailscale}
+          podSelector:
+            matchLabels:
+              tailscale.com/parent-resource: portainer-agent
+              tailscale.com/parent-resource-ns: portainer
+              tailscale.com/parent-resource-type: svc
       ports:
         - {protocol: TCP, port: 9001}
 ---

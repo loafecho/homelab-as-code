@@ -21,6 +21,7 @@
     api_token_id: "{{ proxmox_api_token_id }}"
     api_token_secret: "{{ proxmox_api_token_secret }}"
     validate_certs: "{{ proxmox_validate_certs }}"
+    ca_path: "{{ proxmox_ca_path }}"
     node: "{{ proxmox_node }}"
     vmid: "{{ guest_vmid }}"
     hostname: "{{ guest_name }}"
@@ -43,6 +44,7 @@
     api_token_id: "{{ proxmox_api_token_id }}"
     api_token_secret: "{{ proxmox_api_token_secret }}"
     validate_certs: "{{ proxmox_validate_certs }}"
+    ca_path: "{{ proxmox_ca_path }}"
     vmid: "{{ guest_vmid }}"
     state: "{{ guest_state }}"
   delegate_to: localhost  # API call from the controller; the token never reaches the guest
