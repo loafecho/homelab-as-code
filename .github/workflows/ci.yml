@@ -91,11 +91,13 @@ jobs:
           curl -sSL -o /tmp/kc.tgz "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz"
           tar -xzf /tmp/kc.tgz -C /tmp kubeconform
           sudo install /tmp/kubeconform /usr/local/bin/kubeconform
+      # CRD catalog pinned to a commit: its Cilium 1.20.2 schema update (catalog #1010)
+      # can't be loaded by kubeconform v0.7.0 ("could not find schema"). Bump on purpose.
       - name: kubeconform (core + CRD schemas)
         run: |
           kubeconform -strict -summary \
             -schema-location default \
-            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/ea03cc2abb64ddc0a927c1e3d48a3d0abf66a3de/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
             -skip InitConfiguration,ClusterConfiguration \
             -ignore-filename-pattern 'values\.yaml$' \
             kubernetes/
