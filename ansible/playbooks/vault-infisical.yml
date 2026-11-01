@@ -1,0 +1,10 @@
+---
+# Bind vault's Infisical to loopback. Run from the control node:
+#   ansible-playbook playbooks/vault-infisical.yml --check --diff   # preview
+#   ansible-playbook playbooks/vault-infisical.yml                  # apply
+# Revert: -e vault_infisical_bind_address=0.0.0.0
+- name: Vault Infisical binding (loopback only)
+  hosts: vault
+  gather_facts: false
+  roles:
+    - role: vault_infisical

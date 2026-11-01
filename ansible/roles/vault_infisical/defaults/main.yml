@@ -1,0 +1,17 @@
+---
+# roles/vault_infisical - the self-hosted Infisical server on the vault guest.
+#
+# WHY: docker-compose published Infisical as 0.0.0.0:80->8080, so any LAN host
+# could talk plain HTTP to the secrets API and skip the tailnet ACL entirely.
+# Every real consumer already goes through `tailscale serve`
+# (https://vault.<tailnet> -> http://localhost:80), so the published port only
+# needs to answer on loopback.
+#
+# Scope: only the backend's published port. The compose file and .env stay
+# where the original install put them; .env is never read or templated here.
+
+vault_infisical_dir: /opt/infisical
+vault_infisical_compose_file: docker-compose.prod.yml
+vault_infisical_bind_address: 127.0.0.1
+vault_infisical_host_port: 80
+vault_infisical_container_port: 8080

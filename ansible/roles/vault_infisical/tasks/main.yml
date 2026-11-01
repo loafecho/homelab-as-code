@@ -1,0 +1,48 @@
+---
+# Bind Infisical's published port to loopback, then recreate ONLY the backend.
+#
+# The compose file sets `pull_policy: always` on infisical/infisical:latest, so a
+# bare `docker compose up -d` would pull a new image and could run DB
+# migrations. `--pull never --no-deps backend` reuses the running image and
+# leaves db/redis untouched.
+
+- name: Publish Infisical backend on loopback only
+  ansible.builtin.replace:
+    path: "{{ vault_infisical_dir }}/{{ vault_infisical_compose_file }}"
+    regexp: '^(\s*-\s*)"?(?:[0-9.]+:)?{{ vault_infisical_host_port }}:{{ vault_infisical_container_port }}"?\s*$'
+    replace: '\g<1>"{{ vault_infisical_bind_address }}:{{ vault_infisical_host_port }}:{{ vault_infisical_container_port }}"'
+    backup: true
+  register: vault_infisical_port
+
+- name: Recreate the backend container with the new binding (no pull, no deps)
+  ansible.builtin.command:
+    cmd: >-
+      docker compose -f {{ vault_infisical_compose_file }}
+      up -d --pull never --no-deps backend
+    chdir: "{{ vault_infisical_dir }}"
+  when: vault_infisical_port is changed
+  changed_when: true
+
+- name: Wait for Infisical to answer on loopback
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ vault_infisical_host_port }}/api/status"
+    status_code: 200
+  register: vault_infisical_status
+  retries: 30
+  delay: 5
+  until: vault_infisical_status.status == 200
+  when: not ansible_check_mode
+
+- name: Read the published port binding
+  ansible.builtin.command:
+    cmd: docker port infisical-backend {{ vault_infisical_container_port }}
+  register: vault_infisical_published
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Fail if Infisical is still published beyond loopback
+  ansible.builtin.assert:
+    that:
+      - vault_infisical_published.stdout_lines | reject('match', '^' ~ vault_infisical_bind_address ~ ':') | list | length == 0
+    fail_msg: "infisical-backend still published on: {{ vault_infisical_published.stdout_lines }}"
+  when: not ansible_check_mode

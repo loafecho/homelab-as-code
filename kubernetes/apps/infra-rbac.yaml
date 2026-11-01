@@ -12,7 +12,7 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
+  # No syncPolicy, on purpose: manual sync. This app owns the `cluster` AppProject, so a push to main
+  # must not widen Argo's own permissions unreviewed. Apply a reviewed change with
+  # `argocd app sync infra-rbac`. (Don't write `syncPolicy: {}`: the API server drops the empty block,
+  # so root shows OutOfSync forever.)
