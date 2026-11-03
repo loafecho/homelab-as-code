@@ -49,3 +49,25 @@ variable "pilot_vmid" {
   type        = number
   default     = 980
 }
+
+variable "engine" {
+  description = "Create engine (CT 180). On by default; only scripts/smoke/fleet-smoke.sh turns it off."
+  type        = bool
+  default     = true
+}
+
+variable "engine_ssh_keys" {
+  description = "SSH public keys baked into engine at create time (the control node's Ansible key for this guest)"
+  type        = list(string)
+  default     = []
+}
+
+# Put the managed containers' network taps on the Proxmox firewall bridge.
+# true is what the hypervisor runs (recorded in scripts/smoke/replay/), and
+# scripts/smoke/fleet-smoke.sh's check N plans this default against that replay
+# and requires "No changes.".
+variable "nic_firewall" {
+  description = "Set firewall=1 on the managed guests' network interfaces"
+  type        = bool
+  default     = true
+}

@@ -10,4 +10,12 @@ policy_out: ACCEPT
 IN ACCEPT -source 192.0.2.50 -p tcp -dport 22 # T1 break-glass SSH
 IN ACCEPT -source 192.0.2.51 -p tcp -dport 22 # T1 break-glass SSH
 IN ACCEPT -source 192.0.2.100 -p tcp -dport 22 # Ansible control
-IN ACCEPT -source 192.0.2.101 -p tcp -dport 3025 # tbot on vault joins + renews its cert
+IN ACCEPT -source 192.0.2.50 -p tcp -dport 443 # Teleport proxy - live clients arrive over the tailnet only; LAN management only
+IN ACCEPT -source 192.0.2.51 -p tcp -dport 443 # Teleport proxy - live clients arrive over the tailnet only; LAN management only
+IN ACCEPT -source 192.0.2.100 -p tcp -dport 443 # Teleport proxy - live clients arrive over the tailnet only; LAN management only
+IN ACCEPT -source 192.0.2.190 -p tcp -dport 443 # Teleport proxy - live clients arrive over the tailnet only; LAN management only
+IN ACCEPT -source 192.0.2.50 -p tcp -dport 3025 # Teleport auth - only local clients seen (vault's cert agent retired); management only
+IN ACCEPT -source 192.0.2.51 -p tcp -dport 3025 # Teleport auth - only local clients seen (vault's cert agent retired); management only
+IN ACCEPT -source 192.0.2.100 -p tcp -dport 3025 # Teleport auth - only local clients seen (vault's cert agent retired); management only
+IN ACCEPT -source 192.0.2.190 -p tcp -dport 3025 # Teleport auth - only local clients seen (vault's cert agent retired); management only
+IN ACCEPT -p udp -dport 41641 # tailscaled direct WireGuard (peers authenticate with node keys; DERP fallback rides established)

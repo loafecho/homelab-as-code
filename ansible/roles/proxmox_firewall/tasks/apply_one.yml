@@ -1,0 +1,31 @@
+---
+# One firewall file: diff against live, stage, install with cp, verify.
+# Inputs: fw_src (template), fw_file (name under fw_dir, default firewall_live_dir), and
+# fw_guest for guest.fw.j2. See apply.yml for why this is not a plain template.
+
+- name: "Diff against the live file (report only): {{ fw_file }}"
+  ansible.builtin.template:
+    src: "{{ fw_src }}"
+    dest: "{{ fw_dir | default(firewall_live_dir) }}/{{ fw_file }}"
+  check_mode: true
+  register: fw_live_diff
+
+- name: "Stage {{ fw_file }}"
+  ansible.builtin.template:
+    src: "{{ fw_src }}"
+    dest: "{{ firewall_stage_dir }}/{{ fw_file }}"
+    mode: "0600"
+  diff: false   # the live diff above is the one that matters
+  when: fw_live_diff is changed
+
+- name: "Install into pmxcfs with cp: {{ fw_file }}"
+  ansible.builtin.command:
+    argv: [cp, "{{ firewall_stage_dir }}/{{ fw_file }}", "{{ fw_dir | default(firewall_live_dir) }}/{{ fw_file }}"]
+  when: fw_live_diff is changed and not ansible_check_mode
+  changed_when: true
+
+- name: "Verify the live file matches the render: {{ fw_file }}"
+  ansible.builtin.command:
+    argv: [cmp, "{{ firewall_stage_dir }}/{{ fw_file }}", "{{ fw_dir | default(firewall_live_dir) }}/{{ fw_file }}"]
+  when: fw_live_diff is changed and not ansible_check_mode
+  changed_when: false

@@ -22,5 +22,4 @@ rules:
 
 ignore: |
   ansible/roles/proxmox_firewall/files/expected/
-  ansible/roles/vault_caddy_tls/files/expected/
   ansible/build/

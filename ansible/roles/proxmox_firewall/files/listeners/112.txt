@@ -1,0 +1,32 @@
+# listeners: media (vmid 112) — captured 2026-11-01T21:49Z by scripts/capture-listeners.sh
+# published copy: LAN-reachable lines only (loopback, tailnet and link-local
+# sockets removed); LAN addresses mapped to the example 192.0.2.x scheme
+# <proto> <bind-address> <port> <process>
+tcp * 18555 go2rtc
+tcp * 46967 MainThread
+tcp * 8482 node
+tcp 0.0.0.0 22 sshd
+tcp 0.0.0.0 5355 systemd-resolve
+tcp 0.0.0.0 8096 jellyfin
+tcp :: 22 sshd
+tcp :: 5355 systemd-resolve
+udp * 1900 python3
+udp * 34919 python3
+udp * 5353 python3
+udp 0.0.0.0 1900 python3
+udp 0.0.0.0 41641 tailscaled
+udp 0.0.0.0 46967 MainThread
+udp 0.0.0.0 5353 MainThread
+udp 0.0.0.0 5353 node
+udp 0.0.0.0 53548 python3
+udp 0.0.0.0 5355 systemd-resolve
+udp 0.0.0.0 5540 node
+udp 0.0.0.0 7359 jellyfin
+udp 192.0.2.112 5353 python3
+udp 192.0.2.112 68 systemd-network
+udp :: 41641 tailscaled
+udp :: 46967 MainThread
+udp :: 5353 MainThread
+udp :: 5353 node
+udp :: 5355 systemd-resolve
+udp :: 5540 node

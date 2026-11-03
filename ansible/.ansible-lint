@@ -4,7 +4,6 @@ profile: moderate
 
 exclude_paths:
   - roles/proxmox_firewall/files/expected/   # render baselines, byte-identical to build/, not Ansible content
-  - roles/vault_caddy_tls/files/expected/
   - build/
 
 # Provisioning role bodies are partly stubbed with TODOs (see each role README).

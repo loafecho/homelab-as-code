@@ -1,0 +1,12 @@
+---
+# Intentionally CLOSED LAN listeners — ports that answer on a LAN-reachable
+# address today but get NO allow rule, so a firewall flip drops them on purpose.
+# scripts/tests/check-fw-coverage.py fails on any LAN listener that is neither
+# allowed by the rendered rules nor listed here. Every entry needs a reason.
+# `port` is a number or an "a-b" range; `process` (optional) narrows a range to
+# one program so an unrelated new service in the range still fails the check.
+closed:
+  - { vmid: "112", proto: tcp, port: 5355, reason: "systemd-resolved LLMNR; LAN name resolution is the adguard resolver (192.0.2.53)" }
+  - { vmid: "112", proto: udp, port: 5355, reason: "systemd-resolved LLMNR; LAN name resolution is the adguard resolver (192.0.2.53)" }
+  - { vmid: "112", proto: udp, port: "32768-60999", process: python3,
+      reason: "Home Assistant ephemeral client sockets (SSDP/discovery searches); replies return as established/related" }

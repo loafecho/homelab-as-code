@@ -10,11 +10,12 @@ policy_out: DROP
 IN ACCEPT -source 192.0.2.50 -p tcp -dport 22 # T1 break-glass SSH
 IN ACCEPT -source 192.0.2.51 -p tcp -dport 22 # T1 break-glass SSH
 IN ACCEPT -source 192.0.2.100 -p tcp -dport 22 # Ansible control
-IN ACCEPT -source 192.0.2.100 -p tcp -dport 443 # secret fetch via the Caddy TLS front (roles/vault_caddy_tls)
-IN ACCEPT -source 192.0.2.115 -p tcp -dport 443 # secret fetch via the Caddy TLS front (roles/vault_caddy_tls)
-IN ACCEPT -source 192.0.2.112 -p tcp -dport 443 # secret fetch via the Caddy TLS front (roles/vault_caddy_tls)
-IN ACCEPT -source 192.0.2.190 -p tcp -dport 443 # uptime probe
+IN ACCEPT -source 192.0.2.129 -p tcp -dport 9100 # node_exporter scrape (telemetry CT 103 scrapes vault:9100)
 IN ACCEPT -p udp -dport 41641 # tailscaled direct WireGuard (tailscale serve endpoint used by ESO)
 OUT ACCEPT -p tcp -dport 443 # tailscaled -> coordination server + DERP relays (tailnet endpoint for ESO)
 OUT ACCEPT -p udp -dport 3478 # tailscaled -> STUN (NAT discovery for direct WireGuard paths)
-OUT ACCEPT -dest 192.0.2.115 -p tcp -dport 3025 # tbot -> Teleport auth for Caddy TLS cert renewal. Cert plumbing only, never in the secret-fetch path
+OUT ACCEPT -dest 192.0.2.53 -p udp -dport 53 # DNS to the LAN resolvers (tailscaled bootstrap, chrony pool lookup)
+OUT ACCEPT -dest 192.0.2.1 -p udp -dport 53 # DNS to the LAN resolvers (tailscaled bootstrap, chrony pool lookup)
+OUT ACCEPT -dest 192.0.2.53 -p tcp -dport 53 # DNS over TCP (truncated answers)
+OUT ACCEPT -dest 192.0.2.1 -p tcp -dport 53 # DNS over TCP (truncated answers)
+OUT ACCEPT -p udp -dport 123 # chrony -> pool.ntp.org

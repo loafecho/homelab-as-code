@@ -11,3 +11,40 @@ IN ACCEPT -source 192.0.2.50 -p tcp -dport 22 # T1 break-glass SSH
 IN ACCEPT -source 192.0.2.51 -p tcp -dport 22 # T1 break-glass SSH
 IN ACCEPT -source 192.0.2.100 -p tcp -dport 22 # Ansible control
 IN ACCEPT -source 192.0.2.100 -p tcp -dport 6443 # kubectl/helm/Argo CLI from the control node, the ONLY allowed path to the API server
+IN ACCEPT -source 192.0.2.50 -p tcp -dport 10250 # kubelet - no LAN client, management only
+IN ACCEPT -source 192.0.2.51 -p tcp -dport 10250 # kubelet - no LAN client, management only
+IN ACCEPT -source 192.0.2.100 -p tcp -dport 10250 # kubelet - no LAN client, management only
+IN ACCEPT -source 192.0.2.190 -p tcp -dport 10250 # kubelet - no LAN client, management only
+IN ACCEPT -source 192.0.2.50 -p tcp -dport 2379 # etcd client - no LAN client, management only
+IN ACCEPT -source 192.0.2.51 -p tcp -dport 2379 # etcd client - no LAN client, management only
+IN ACCEPT -source 192.0.2.100 -p tcp -dport 2379 # etcd client - no LAN client, management only
+IN ACCEPT -source 192.0.2.190 -p tcp -dport 2379 # etcd client - no LAN client, management only
+IN ACCEPT -source 192.0.2.50 -p tcp -dport 2380 # etcd peer - no LAN client, management only
+IN ACCEPT -source 192.0.2.51 -p tcp -dport 2380 # etcd peer - no LAN client, management only
+IN ACCEPT -source 192.0.2.100 -p tcp -dport 2380 # etcd peer - no LAN client, management only
+IN ACCEPT -source 192.0.2.190 -p tcp -dport 2380 # etcd peer - no LAN client, management only
+IN ACCEPT -source 192.0.2.50 -p tcp -dport 4240 # cilium health - no LAN client, management only
+IN ACCEPT -source 192.0.2.51 -p tcp -dport 4240 # cilium health - no LAN client, management only
+IN ACCEPT -source 192.0.2.100 -p tcp -dport 4240 # cilium health - no LAN client, management only
+IN ACCEPT -source 192.0.2.190 -p tcp -dport 4240 # cilium health - no LAN client, management only
+IN ACCEPT -source 192.0.2.50 -p tcp -dport 4244 # hubble - no LAN client, management only
+IN ACCEPT -source 192.0.2.51 -p tcp -dport 4244 # hubble - no LAN client, management only
+IN ACCEPT -source 192.0.2.100 -p tcp -dport 4244 # hubble - no LAN client, management only
+IN ACCEPT -source 192.0.2.190 -p tcp -dport 4244 # hubble - no LAN client, management only
+IN ACCEPT -source 192.0.2.50 -p tcp -dport 9963 # cilium-operator metrics - no LAN client, management only
+IN ACCEPT -source 192.0.2.51 -p tcp -dport 9963 # cilium-operator metrics - no LAN client, management only
+IN ACCEPT -source 192.0.2.100 -p tcp -dport 9963 # cilium-operator metrics - no LAN client, management only
+IN ACCEPT -source 192.0.2.190 -p tcp -dport 9963 # cilium-operator metrics - no LAN client, management only
+IN ACCEPT -source 192.0.2.50 -p tcp -dport 9964 # cilium-envoy metrics - no LAN client, management only
+IN ACCEPT -source 192.0.2.51 -p tcp -dport 9964 # cilium-envoy metrics - no LAN client, management only
+IN ACCEPT -source 192.0.2.100 -p tcp -dport 9964 # cilium-envoy metrics - no LAN client, management only
+IN ACCEPT -source 192.0.2.190 -p tcp -dport 9964 # cilium-envoy metrics - no LAN client, management only
+IN ACCEPT -source 192.0.2.50 -p udp -dport 8472 # cilium VXLAN - single node, no LAN peer, management only
+IN ACCEPT -source 192.0.2.51 -p udp -dport 8472 # cilium VXLAN - single node, no LAN peer, management only
+IN ACCEPT -source 192.0.2.100 -p udp -dport 8472 # cilium VXLAN - single node, no LAN peer, management only
+IN ACCEPT -source 192.0.2.190 -p udp -dport 8472 # cilium VXLAN - single node, no LAN peer, management only
+IN ACCEPT -source 192.0.2.50 -p tcp -dport 30204 # portainer-agent NodePort - its LoadBalancer is tailnet-only, management only
+IN ACCEPT -source 192.0.2.51 -p tcp -dport 30204 # portainer-agent NodePort - its LoadBalancer is tailnet-only, management only
+IN ACCEPT -source 192.0.2.100 -p tcp -dport 30204 # portainer-agent NodePort - its LoadBalancer is tailnet-only, management only
+IN ACCEPT -source 192.0.2.190 -p tcp -dport 30204 # portainer-agent NodePort - its LoadBalancer is tailnet-only, management only
+IN ACCEPT -p udp -dport 41641 # tailscaled (operator proxy pods) - they bind random ports in pod netns; DERP rides established

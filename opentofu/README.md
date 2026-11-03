@@ -9,7 +9,7 @@ change is only merged when its plan shows **0 to destroy**.
 |---|---|
 | `versions.tf` | OpenTofu >= 1.10, `bpg/proxmox` pinned exactly, state + plan encryption through an external key provider |
 | `provider.tf`, `variables.tf` | API endpoint and a pool-scoped token (never in git) |
-| `main.tf` | the managed guests: `worker` (CT 102, imported) and an optional throwaway `pilot` CT |
+| `main.tf` | the managed guests: `worker` (CT 102, imported), `engine` (CT 180, created here) and an optional throwaway `pilot` CT |
 | `scripts/fleet` | `fleet init / plan / apply / state` with one YubiKey unlock per command |
 | `scripts/lib/unlock.sh` | YubiKey helpers: PIN-tries guard, one unwrap per run, token decrypt |
 | `scripts/age-key-provider.sh` | OpenTofu `external` key provider: unwraps the state key; no key → tofu refuses |

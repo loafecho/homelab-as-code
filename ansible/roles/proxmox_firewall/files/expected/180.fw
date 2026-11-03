@@ -1,0 +1,13 @@
+# /etc/pve/firewall/180.fw  (engine, zone=worker)
+# GENERATED — edit host_vars/engine.yml, never this file.
+[OPTIONS]
+enable: 1
+policy_in: DROP
+policy_out: ACCEPT
+# established/related replies auto-accepted by conntrack
+
+[RULES]
+IN ACCEPT -source 192.0.2.50 -p tcp -dport 22 # T1 break-glass SSH
+IN ACCEPT -source 192.0.2.51 -p tcp -dport 22 # T1 break-glass SSH
+IN ACCEPT -source 192.0.2.100 -p tcp -dport 22 # Ansible control
+IN ACCEPT -source 192.0.2.100 -p tcp -dport 8888 # SearXNG - the agent gateway on control is the only caller

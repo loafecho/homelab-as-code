@@ -1,0 +1,20 @@
+# /etc/pve/firewall/901.fw  (email, zone=sensitive)
+# GENERATED — edit host_vars/email.yml, never this file.
+[OPTIONS]
+enable: 1
+policy_in: DROP
+policy_out: ACCEPT
+# established/related replies auto-accepted by conntrack
+
+[RULES]
+IN ACCEPT -source 192.0.2.50 -p tcp -dport 22 # T1 break-glass SSH
+IN ACCEPT -source 192.0.2.51 -p tcp -dport 22 # T1 break-glass SSH
+IN ACCEPT -source 192.0.2.100 -p tcp -dport 22 # Ansible control
+# DISABLED: IN ACCEPT -source 192.0.2.130 -p tcp -dport 25 # outbound mail from an app on kube. ENABLE when SMTP is configured on the deployment
+# DISABLED: IN ACCEPT -source 192.0.2.115 -p tcp -dport 22 # ENABLE when an integration is onboarded
+# DISABLED: IN ACCEPT -source 192.0.2.115 -p tcp -dport 443 # ENABLE when an integration is onboarded
+IN ACCEPT -source 192.0.2.50 -p tcp -dport 25 # postfix on the LAN IP - no live LAN client (its old senders are gone); management only
+IN ACCEPT -source 192.0.2.51 -p tcp -dport 25 # postfix on the LAN IP - no live LAN client (its old senders are gone); management only
+IN ACCEPT -source 192.0.2.100 -p tcp -dport 25 # postfix on the LAN IP - no live LAN client (its old senders are gone); management only
+IN ACCEPT -source 192.0.2.190 -p tcp -dport 25 # postfix on the LAN IP - no live LAN client (its old senders are gone); management only
+IN ACCEPT -p udp -dport 41641 # tailscaled direct WireGuard (peers authenticate with node keys; DERP fallback rides established)

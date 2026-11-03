@@ -1,0 +1,10 @@
+# listeners: teleport (vmid 115) — captured 2026-11-01T21:49Z by scripts/capture-listeners.sh
+# published copy: LAN-reachable lines only (loopback, tailnet and link-local
+# sockets removed); LAN addresses mapped to the example 192.0.2.x scheme
+# <proto> <bind-address> <port> <process>
+tcp * 22 sshd
+tcp * 3025 teleport
+tcp * 443 teleport
+udp 0.0.0.0 41641 tailscaled
+udp 0.0.0.0 68 dhclient
+udp :: 41641 tailscaled

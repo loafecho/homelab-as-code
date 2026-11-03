@@ -6,8 +6,9 @@ Proxmox's built-in management rules (8006, 22, 5900-5999, 3128) admit the
 missing. This checks a rendered cluster.fw (default: the committed baseline,
 which check-renders.sh keeps byte-identical to the render) for:
   - exactly one [IPSET management] section;
-  - members == admin_devices IPs + the control-zone guest IP(s), nothing else
-    (so no lan_cidr, no subnet, no other guest or the monitor).
+  - members == admin_devices IPs + the control-zone guest IP(s) + the OpenTofu
+    deploy box (group_vars deploy_box -> the hypervisor's :8006 API),
+    nothing else (so no lan_cidr, no subnet, no other guest).
 Offline: reads files only.
 
   python3 scripts/tests/check-mgmt-ipset.py [path/to/cluster.fw]
@@ -41,6 +42,7 @@ def main():
     gv = yaml.safe_load(GROUP_VARS.read_text(encoding="utf-8"))
     want = {d["ip"] for d in gv["admin_devices"]}
     want |= {g["ip"] for g in gv["guests"].values() if g.get("zone") == "control" and g.get("ip")}
+    want.add(gv["deploy_box"]["ip"])
     lan = ipaddress.ip_network(gv["lan_cidr"])
 
     members, seen = ipset_members(fw.read_text(encoding="utf-8"), "management")
@@ -52,13 +54,13 @@ def main():
         if net.num_addresses > 1 and net.overlaps(lan):
             problems.append(f"management member {m} is a subnet overlapping lan_cidr {lan}")
     if set(members) != want or len(members) != len(set(members)):
-        problems.append(f"management members {sorted(members)} != admin_devices + control {sorted(want)}")
+        problems.append(f"management members {sorted(members)} != admin_devices + control + deploy_box {sorted(want)}")
     if problems:
         print(f"check-mgmt-ipset: FAIL ({fw})")
         for p in problems:
             print("  " + p)
         sys.exit(1)
-    print(f"check-mgmt-ipset: OK ({len(members)} members: admin_devices + control only)")
+    print(f"check-mgmt-ipset: OK ({len(members)} members: admin_devices + control + deploy_box only)")
 
 
 if __name__ == "__main__":

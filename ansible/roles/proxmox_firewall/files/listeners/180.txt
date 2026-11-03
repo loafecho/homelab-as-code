@@ -1,0 +1,6 @@
+# listeners: engine (vmid 180) — captured 2026-11-01T21:49Z by scripts/capture-listeners.sh
+# published copy: LAN-reachable lines only (loopback, tailnet and link-local
+# sockets removed); LAN addresses mapped to the example 192.0.2.x scheme
+# <proto> <bind-address> <port> <process>
+tcp * 22 sshd
+tcp 192.0.2.61 8888 granian_wsgi_19

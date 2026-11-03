@@ -8,7 +8,7 @@
     fail_msg: "guest_type must be 'vm' or 'lxc' (got: {{ guest_type }})"
     quiet: true
 
-- name: Skip guests with no vmid (monitor = RPi, gateway = not built)
+- name: Skip guests with no vmid (gateway = not built)
   ansible.builtin.debug:
     msg: "{{ guest_name }} has no vmid — not Proxmox-provisioned, skipping."
   when: guest_vmid is not defined or guest_vmid in [None, '', omit]

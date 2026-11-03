@@ -27,10 +27,9 @@
 #      failed/unreachable counts (plus a missing-RECAP guard: a run that produced
 #      no RECAP measured nothing and is an ERROR).
 #   b. Staging renders, materialized FOR REAL (localhost-only playbooks that touch
-#      no live host: render-firewall, validate-tailscale-acl, render-caddy), then
+#      no live host: render-firewall, validate-tailscale-acl), then
 #      diffed against committed references:
 #        build/firewall  vs roles/proxmox_firewall/files/expected/
-#        build/caddy     vs roles/vault_caddy_tls/files/expected/
 #        build/tailscale/acl.hujson vs roles/tailscale_acl/files/acl.hujson
 #      A missing reference dir is announced as `SKIPPED (no committed reference)`
 #      in the verdict, never a silent pass. A stale reference reads as false
@@ -81,7 +80,7 @@ have_recap=$(grep -c 'PLAY RECAP' "$recap_file")
 #    nothing.
 # ---------------------------------------------------------------------------
 render_err=0
-for pb in playbooks/render-firewall.yml playbooks/validate-tailscale-acl.yml playbooks/render-caddy.yml; do
+for pb in playbooks/render-firewall.yml playbooks/validate-tailscale-acl.yml; do
   if ! ansible-playbook "$pb" >/dev/null 2>&1; then
     echo "drift-check: render playbook FAILED: $pb" >&2
     render_err=1
@@ -103,7 +102,6 @@ diff_dir() {  # expected_dir build_dir label
   fi
 }
 diff_dir roles/proxmox_firewall/files/expected build/firewall  firewall
-diff_dir roles/vault_caddy_tls/files/expected  build/caddy     caddy
 # The staged ACL is a byte copy of its committed source — the source is the reference.
 if ! diff -u roles/tailscale_acl/files/acl.hujson build/tailscale/acl.hujson; then
   render_drift+=("render:tailscale")

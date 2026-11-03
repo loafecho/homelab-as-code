@@ -11,3 +11,16 @@ IN ACCEPT -source 192.0.2.50 -p tcp -dport 22 # T1 break-glass SSH
 IN ACCEPT -source 192.0.2.51 -p tcp -dport 22 # T1 break-glass SSH
 IN ACCEPT -source 192.0.2.100 -p tcp -dport 22 # Ansible control
 # UNRESOLVED src 'gateway' (no IP yet) -> 8096/tcp # media server via the DMZ gateway. ENABLE when gateway is built
+IN ACCEPT -source 192.0.2.0/24 -p tcp -dport 8096 # Jellyfin - LAN TVs play over the LAN (Devices table, 2026-11-01)
+IN ACCEPT -source 192.0.2.0/24 -p udp -dport 7359 # Jellyfin client discovery - LAN TVs
+IN ACCEPT -source 192.0.2.0/24 -p tcp -dport 18555 # go2rtc WebRTC (Home Assistant cameras) - phones on Wi-Fi may connect direct; no evidence either way, kept LAN as today
+IN ACCEPT -source 192.0.2.50 -p tcp -dport 8482 # home-assistant-matter-hub web UI - no known LAN client, management only
+IN ACCEPT -source 192.0.2.51 -p tcp -dport 8482 # home-assistant-matter-hub web UI - no known LAN client, management only
+IN ACCEPT -source 192.0.2.100 -p tcp -dport 8482 # home-assistant-matter-hub web UI - no known LAN client, management only
+IN ACCEPT -source 192.0.2.190 -p tcp -dport 8482 # home-assistant-matter-hub web UI - no known LAN client, management only
+IN ACCEPT -p udp -dport 5540 # FLAG: Matter bridge (matter-hub) - LAN Matter controllers dial in; kept open (IPv4 + IPv6 link-local, as today)
+IN ACCEPT -p tcp -dport 46967 # FLAG: unknown - python-matter-server listener; kept open (IPv4 + IPv6 link-local, as today)
+IN ACCEPT -p udp -dport 46967 # FLAG: unknown - python-matter-server listener; kept open (IPv4 + IPv6 link-local, as today)
+IN ACCEPT -p udp -dport 5353 # FLAG: mDNS - Home Assistant / Matter device discovery; kept open (IPv4 + IPv6 link-local, as today)
+IN ACCEPT -p udp -dport 1900 # FLAG: SSDP - Home Assistant device discovery; kept open (IPv4 + IPv6 link-local, as today)
+IN ACCEPT -p udp -dport 41641 # tailscaled direct WireGuard (peers authenticate with node keys; DERP fallback rides established)

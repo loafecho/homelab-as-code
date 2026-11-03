@@ -20,7 +20,23 @@ firewall:
     - { src: control, port: 22, proto: tcp, enabled: true, comment: "Ansible control" }
     - { src: control, port: 6443, proto: tcp, enabled: true,
         comment: "kubectl/helm/Argo CLI from the control node, the ONLY allowed path to the API server" }
-    # Deliberately NOT opened: Hubble :4244 and Cilium metrics :9963/:9964.
+    # Deliberately NOT opened to the LAN: Hubble :4244 and Cilium metrics
+    # :9963/:9964. They are host-network ports with no Service in front.
+    # Single-node cluster: kubelet, etcd and Cilium talk to themselves on the
+    # node (never through the tap), so each listener from live `ss -tulnp`
+    # (2026-11-01) is opened to the management set only.
+    - { src: mgmt, port: 10250, proto: tcp, enabled: true, comment: "kubelet - no LAN client, management only" }
+    - { src: mgmt, port: 2379, proto: tcp, enabled: true, comment: "etcd client - no LAN client, management only" }
+    - { src: mgmt, port: 2380, proto: tcp, enabled: true, comment: "etcd peer - no LAN client, management only" }
+    - { src: mgmt, port: 4240, proto: tcp, enabled: true, comment: "cilium health - no LAN client, management only" }
+    - { src: mgmt, port: 4244, proto: tcp, enabled: true, comment: "hubble - no LAN client, management only" }
+    - { src: mgmt, port: 9963, proto: tcp, enabled: true, comment: "cilium-operator metrics - no LAN client, management only" }
+    - { src: mgmt, port: 9964, proto: tcp, enabled: true, comment: "cilium-envoy metrics - no LAN client, management only" }
+    - { src: mgmt, port: 8472, proto: udp, enabled: true, comment: "cilium VXLAN - single node, no LAN peer, management only" }
+    - { src: mgmt, port: 30204, proto: tcp, enabled: true,
+        comment: "portainer-agent NodePort - its LoadBalancer is tailnet-only, management only" }
+    - { src: internet, port: 41641, proto: udp, enabled: true,
+        comment: "tailscaled (operator proxy pods) - they bind random ports in pod netns; DERP rides established" }
   egress: []
 
 # --- Declared hardware ---

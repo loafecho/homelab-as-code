@@ -8,6 +8,7 @@
 #   drift      kube has 4 cores instead of 8             -> 1 DRIFT kube:cores
 #   stray      an undeclared, unallowlisted vmid exists  -> 1 DRIFT vmid:<id>:unmanaged
 #   missing    a declared guest does not exist live      -> 1 DRIFT media:vmid
+#   nicfw      vault's NIC lost its firewall=1 flag       -> 1 DRIFT vault:net0
 #   unreach    ssh fails                                 -> 2 ERROR
 #   empty      ssh succeeds but prints nothing           -> 2 ERROR
 set -uo pipefail
@@ -36,7 +37,7 @@ cores: 2
 memory: 3072
 balloon: 1792
 scsi0: local-lvm:vm-101-disk-0,size=16G
-net0: virtio=$(mac),bridge=vmbr0
+net0: virtio=$(mac),bridge=vmbr0,firewall=1
 onboot: 1
 startup: order=1,up=30
 ===QM 112===
@@ -45,7 +46,7 @@ cores: 4
 memory: 8192
 balloon: 8192
 scsi0: local-lvm:vm-112-disk-0,size=64G
-net0: virtio=$(mac),bridge=vmbr0
+net0: virtio=$(mac),bridge=vmbr0,firewall=1
 onboot: 1
 startup: order=3
 machine: q35
@@ -67,8 +68,24 @@ hostname: teleport
 cores: 2
 memory: 2048
 rootfs: local-lvm:vm-115-disk-0,size=8G
-net0: name=eth0,bridge=vmbr0,hwaddr=$(mac),ip=dhcp,type=veth
+net0: name=eth0,bridge=vmbr0,firewall=1,hwaddr=$(mac),ip=dhcp,type=veth
 onboot: 1
+===PCT 180===
+hostname: engine
+cores: 2
+memory: 4096
+swap: 512
+rootfs: local-lvm:vm-180-disk-0,size=32G
+net0: name=eth0,bridge=vmbr0,firewall=1,hwaddr=$(mac),ip=192.0.2.61/24,gw=192.0.2.1,type=veth
+onboot: 1
+===PCT 901===
+hostname: email
+cores: 4
+memory: 4096
+rootfs: local-lvm:vm-901-disk-0,size=8G
+net0: name=eth0,bridge=vmbr0,firewall=1,hwaddr=$(mac),ip=dhcp,type=veth
+onboot: 1
+tags: email
 DUMP
 }
 
@@ -109,6 +126,9 @@ run_case stray 1 "DRIFT vmid:199:unmanaged"
 
 write_clean; sed -i '/^===QM 112===$/,/^===QM 120===$/{/^===QM 120===$/!d}' "$T/live.txt"
 run_case missing 1 "DRIFT media:vmid"
+
+write_clean; sed -i '/^name: vault$/,/^===/ s/,firewall=1$//' "$T/live.txt"
+run_case nicfw 1 "DRIFT vault:net0"
 
 run_case unreach 2 "Gate-input ERROR" fail
 run_case empty 2 "Gate-input ERROR" empty

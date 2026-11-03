@@ -1,0 +1,36 @@
+---
+# email (CT 901) - mail server. Sensitive zone.
+zone: sensitive
+firewall:
+  policy_in: DROP
+  policy_out: ACCEPT                   # email -> internet:587/465 (SMTP submission) is app-initiated
+  always_allow_established: true
+  ingress:
+    - { src: ref:admin_devices, port: 22, proto: tcp, enabled: true, comment: "T1 break-glass SSH" }
+    - { src: control, port: 22, proto: tcp, enabled: true, comment: "Ansible control" }
+    # Ships DISABLED: the app on kube that would send mail through this guest
+    # declares no SMTP settings, so nothing sends through it today. Enable it
+    # when that app is actually wired to SMTP.
+    - { src: kube, port: 25, proto: tcp, enabled: false,
+        comment: "outbound mail from an app on kube. ENABLE when SMTP is configured on the deployment" }
+    - { src: teleport, port: 22, proto: tcp, enabled: false, comment: "ENABLE when an integration is onboarded" }
+    - { src: teleport, port: 443, proto: tcp, enabled: false, comment: "ENABLE when an integration is onboarded" }
+    # Rules below come from live `ss -tulnp` (2026-11-01, captured in
+    # roles/proxmox_firewall/files/listeners/<vmid>.txt). A port with no known
+    # client is opened to the management set (`src: mgmt`) only.
+    - { src: mgmt, port: 25, proto: tcp, enabled: true,
+        comment: "postfix on the LAN IP - no live LAN client (its old senders are gone); management only" }
+    - { src: internet, port: 41641, proto: udp, enabled: true,
+        comment: "tailscaled direct WireGuard (peers authenticate with node keys; DERP fallback rides established)" }
+  egress: []
+  # policy_out ACCEPT covers email -> internet:587/465 SMTP submission.
+
+# --- Declared hardware (LXC: net0 is compared with the MAC stripped) ---
+# net0 carries firewall=1 (set with `pct set`; roles/proxmox_guest's lxc.yml
+# does not model the LXC flag yet).
+guest_cores: 4
+guest_memory: 4096
+guest_disk_gb: 8
+guest_net0: "name=eth0,bridge=vmbr0,firewall=1,ip=dhcp,type=veth"
+guest_onboot: true
+guest_tags: "email"

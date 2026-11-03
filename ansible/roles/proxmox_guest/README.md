@@ -10,7 +10,7 @@ over separate per-type roles so the variable contract stays in one place.
 |-----|--------|---------|
 | `guest_type` | inventory (`vm`\|`lxc`) | Dispatch selector, **required** |
 | `guest_name` | `inventory_hostname` | Guest hostname |
-| `guest_vmid` | inventory / `guests` map | Proxmox VMID. **Null ⇒ skipped** (monitor, gateway) |
+| `guest_vmid` | inventory / `guests` map | Proxmox VMID. **Null ⇒ skipped** (gateway) |
 | `guest_ip` | `guests[host].ip` | Reserved address |
 | `guest_zone` | `guests[host].zone` | Trust zone (informational here) |
 | `guest_state` | default `started` | `present`\|`started`\|`stopped`\|`absent` |

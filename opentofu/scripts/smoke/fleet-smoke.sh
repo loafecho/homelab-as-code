@@ -21,6 +21,9 @@
 #   F  the token and the state key are in no output, log or file
 #   G  every Proxmox call carried the token
 #   R  every GET was answered from the replay (none made up)
+#   N  the repo's DEFAULT config (nic_firewall=true) plans "No changes." against
+#      the replay. The hypervisor runs CT 102 with firewall=1 (recorded
+#      2026-11-02), so no run pins TF_VAR_nic_firewall; N names the check.
 #
 #   bash scripts/smoke/fleet-smoke.sh        # PASS = "RESULT: fleet smoke passed"
 set -euo pipefail
@@ -66,6 +69,8 @@ chmod +x "$S/shim/"*
 : > "$S/unwraps.log"
 
 fails=0 runs=()
+unset TF_VAR_nic_firewall   # never inherit it: N must plan the REPO default
+nicfw=""   # empty = repo default; set only to replay a different live NIC firewall flag
 ok()  { echo "SMOKE: $*"; }
 bad() { echo "SMOKE FAIL: $*"; fails=$((fails + 1)); }
 # one fleet command in a pty, as an operator runs it; leaves $rc, $n (unwraps), $S/out.txt
@@ -74,9 +79,11 @@ fleet() {
   before=$(wc -l < "$S/unwraps.log")
   echo "=== fleet $*"
   rc=0
-  HOME="$S/home" PATH="$S/shim:$PATH" FLEET_AGE_IDENTITY=keys/smoke-identity.txt \
+  local fw=()
+  [ -z "$nicfw" ] || fw=("TF_VAR_nic_firewall=$nicfw")
+  HOME="$S/home" PATH="$S/shim:$PATH" FLEET_AGE_IDENTITY=keys/smoke-identity.txt TF_VAR_engine=false \
     FLEET_PVE_ENDPOINT="https://127.0.0.1:$port/" FLEET_PVE_CA="$S/cert.pem" \
-    python3 "$REPO/scripts/smoke/pty_driver.py" "$S" bash "$S/repo/scripts/fleet" "$@" \
+    env "${fw[@]}" python3 "$REPO/scripts/smoke/pty_driver.py" "$S" bash "$S/repo/scripts/fleet" "$@" \
     | tr -d '\r' > "$S/out.txt" || rc=$?
   n=$(( $(wc -l < "$S/unwraps.log") - before ))
   cat "$S/out.txt" >> "$S/terminal.txt"   # every run's screen output, for check F
@@ -118,6 +125,14 @@ if [ "$rc" -eq 0 ] && grep -q '^No changes\.' "$S/out.txt"; then
   ok "D second plan: $(grep -m1 '^No changes\.' "$S/out.txt")"
 else
   bad "D second plan is not 'No changes.' (exit $rc; got: $(grep -m1 -E '^(Plan:|Error)' "$S/out.txt" || echo nothing))"
+fi
+
+fleet plan   # the repo default, whatever variables.tf says
+attrs=$(grep -E '^[[:space:]]*[-+~] [a-z_]+[[:space:]]+=' "$S/out.txt" | sed -E 's/^[[:space:]]+//; s/[[:space:]]+/ /g' || true)
+if [ "$rc" -eq 0 ] && grep -q '^No changes\.' "$S/out.txt"; then
+  ok "N default config vs the replay: $(grep -m1 '^No changes\.' "$S/out.txt")"
+else
+  bad "N default plan is not 'No changes.' (exit $rc; got: $(grep -m1 -E '^(Plan:|No changes|Error)' "$S/out.txt" || echo nothing); changed: ${attrs:-none})"
 fi
 
 fleet state list

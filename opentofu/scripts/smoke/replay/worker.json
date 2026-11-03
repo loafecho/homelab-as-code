@@ -1,5 +1,8 @@
 {
- "captured": "2026-10-28T00:28:15+00:00",
+ "captured": "2026-11-02T18:11:25+00:00",
+ "filtered": [
+  "only CT 102 kept in /cluster/resources, /pools/pilot and /pools?poolid=pilot (the smoke plans CT 102 alone)"
+ ],
  "get": {
   "/cluster/resources?type=vm": [
    {
@@ -27,31 +30,32 @@
   ],
   "/nodes": [
    {
-    "cpu": 0.635878355259761,
-    "disk": 31682953216,
+    "cpu": 0.232581155977831,
+    "disk": 31849971712,
     "id": "node/hypervisor",
     "level": "",
     "maxcpu": 20,
     "maxdisk": 72722055168,
     "maxmem": 101157568512,
-    "mem": 74969423872,
+    "mem": 76967870464,
     "node": "hypervisor",
     "status": "online",
     "type": "node",
-    "uptime": 4431361
+    "uptime": 4927156
    }
   ],
   "/nodes/hypervisor/lxc/102/config": {
    "arch": "amd64",
    "cores": 2,
-   "digest": "eefc4d1bf75ca0bc7fdbc30c5a50cfddf14c8854",
+   "digest": "5007278401bd520d0370d89a96d3a7e16d5c4d31",
    "features": "nesting=1",
    "hostname": "worker",
    "memory": 2048,
    "nameserver": "192.0.2.1",
-   "net0": "name=eth0,bridge=vmbr0,hwaddr=@MAC@,ip=dhcp,type=veth",
+   "net0": "name=eth0,bridge=vmbr0,firewall=1,host-managed=0,hwaddr=@MAC@,ip=dhcp,type=veth",
    "onboot": 0,
    "ostype": "debian",
+   "parent": "pre-tofu-import",
    "rootfs": "local-lvm:vm-102-disk-0,size=16G",
    "searchdomain": "lan",
    "swap": 512,
@@ -82,39 +86,39 @@
   "/nodes/hypervisor/storage": [
    {
     "active": 1,
-    "avail": 357868929182,
+    "avail": 335857704974,
     "content": "images,rootdir",
     "enabled": 1,
     "shared": 0,
     "storage": "local-lvm",
     "total": 932678991872,
     "type": "lvmthin",
-    "used": 574810062690,
-    "used_fraction": 0.616299999999235
+    "used": 596821286898,
+    "used_fraction": 0.639899999999043
    },
    {
     "active": 1,
-    "avail": 478025363456,
+    "avail": 37131190272,
+    "content": "vztmpl,backup,snippets,iso,import,images,rootdir",
+    "enabled": 1,
+    "shared": 0,
+    "storage": "local",
+    "total": 72722055168,
+    "type": "dir",
+    "used": 31849967616,
+    "used_fraction": 0.437968475209086
+   },
+   {
+    "active": 1,
+    "avail": 541140840448,
     "content": "backup,rootdir,images",
     "enabled": 1,
     "shared": 0,
     "storage": "backup",
     "total": 1967846068224,
     "type": "dir",
-    "used": 1389784035328,
-    "used_fraction": 0.706246315588238
-   },
-   {
-    "active": 1,
-    "avail": 37289766912,
-    "content": "iso,images,import,vztmpl,backup,rootdir,snippets",
-    "enabled": 1,
-    "shared": 0,
-    "storage": "local",
-    "total": 72722055168,
-    "type": "dir",
-    "used": 31691390976,
-    "used_fraction": 0.435787889970761
+    "used": 1326668558336,
+    "used_fraction": 0.674172934437566
    }
   ],
   "/pools": [
@@ -141,7 +145,6 @@
      "netin": 0,
      "netout": 0,
      "node": "hypervisor",
-     "pool": "pilot",
      "status": "stopped",
      "template": 0,
      "type": "lxc",
@@ -170,7 +173,6 @@
       "netin": 0,
       "netout": 0,
       "node": "hypervisor",
-      "pool": "pilot",
       "status": "stopped",
       "template": 0,
       "type": "lxc",
@@ -187,8 +189,6 @@
    "version": "9.2.2"
   }
  },
- "simulated": [
-  "CT 102 is a member of pool pilot (/pools/pilot, /pools?poolid=pilot, /cluster/resources)"
- ],
+ "simulated": [],
  "source": "pvesh get as root on the hypervisor (scripts/smoke/capture-replay.sh)"
 }

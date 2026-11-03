@@ -1,0 +1,18 @@
+# listeners: kube (vmid 130) — captured 2026-11-01T21:49Z by scripts/capture-listeners.sh
+# published copy: LAN-reachable lines only (loopback, tailnet and link-local
+# sockets removed); LAN addresses mapped to the example 192.0.2.x scheme
+# <proto> <bind-address> <port> <process>
+tcp * 10250 kubelet
+tcp * 30204 nodeport:portainer-agent
+tcp * 4244 cilium-agent
+tcp * 6443 kube-apiserver
+tcp * 9963 cilium-operator
+tcp 0.0.0.0 22 sshd
+tcp 0.0.0.0 9964 cilium-envoy
+tcp 192.0.2.130 2379 etcd
+tcp 192.0.2.130 2380 etcd
+tcp 192.0.2.130 4240 cilium-agent
+tcp :: 22 sshd
+udp 0.0.0.0 8472 -
+udp 192.0.2.130 68 systemd-network
+udp :: 8472 -

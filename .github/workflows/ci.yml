@@ -38,10 +38,41 @@ jobs:
         run: python3 scripts/lint-controller-tasks.py
       - name: Tailscale ACL validator regression tests
         run: python3 scripts/tests/test-validate-acl.py
-      - name: render firewall / Caddy / ACL and diff against baselines
+      - name: render firewall / ACL and diff against baselines
         run: ./scripts/check-renders.sh
       - name: guest-config comparator tests
         run: ./scripts/tests/test-check-guest-config.sh
+      - name: firewall coverage vs live listeners
+        run: python3 scripts/tests/check-fw-coverage.py
+      - name: coverage check can fail (control, vault :9100 rule deleted)
+        run: |
+          set -u
+          ctl=$(mktemp -d)
+          cp ansible/roles/proxmox_firewall/files/expected/*.fw "$ctl/"
+          sed -i '/-dport 9100/d' "$ctl/101.fw"
+          if python3 scripts/tests/check-fw-coverage.py --fw-dir "$ctl"; then
+            echo "::error::coverage check passed with vault :9100 rule deleted"; exit 1
+          fi
+          echo "control OK: deleting one rule makes the coverage check fail"
+      - name: fw-rollback dry run
+        run: |
+          bash scripts/fw-rollback.sh --dry-run now
+          bash scripts/fw-rollback.sh --dry-run arm 10
+          bash scripts/fw-rollback.sh --dry-run disarm
+      - name: fw-rollback tests (sysctl reset, conntrack watch)
+        run: bash scripts/tests/test-fw-rollback.sh
+      - name: fw-rollback tests can fail (control, no sysctl reset)
+        run: |
+          set -eu
+          old=$(mktemp)
+          sed '/bridge-nf-call-iptables=0/d' scripts/fw-rollback.sh > "$old"
+          if grep -q 'bridge-nf-call-iptables=0' "$old"; then
+            echo "::error::control mutation did not apply"; exit 1
+          fi
+          if bash scripts/tests/test-fw-rollback.sh "$old"; then
+            echo "::error::tests passed against a rollback that leaves bridge-nf-call on"; exit 1
+          fi
+          echo "control OK: a rollback without the sysctl reset fails the tests"
 
   shellcheck:
     name: shellcheck

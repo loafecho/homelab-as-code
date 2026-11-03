@@ -4,17 +4,23 @@ Renders Proxmox host firewall rule files from the firewall data model:
 
 - **`<vmid>.fw`**: one per guest, from the `firewall:` block in
   `host_vars/<guest>.yml`. Source names (`guest` / `group:NAME` /
-  `ref:admin_devices` / `internet`) are resolved to IPs through the `guests`
-  map in `group_vars/all.yml`.
-- **`cluster.fw`**: datacenter level. Carries the hypervisor's :8006 console
-  allow for `admin_devices` (a HOST port, so it does not belong in any
-  `<vmid>.fw`).
+  `ref:admin_devices` / `internet` or `any` / `lan` / `mgmt`) are resolved to
+  IPs through the maps in `group_vars/all.yml`. `lan` is `lan_cidr`; `mgmt` is
+  the management set (`firewall_mgmt_sources`: admin devices, the control
+  node and the OpenTofu deploy box).
+- **`cluster.fw`**: datacenter level. Carries the `management` IPSET, the
+  hypervisor's :8006 console allow for `admin_devices` and the hypervisor's own
+  listeners (`firewall_host_rules`). These are HOST ports, so they do not
+  belong in any `<vmid>.fw`. `policy_in` is `firewall_cluster_policy_in`
+  (default DROP; the first live step uses ACCEPT).
+- **`host.fw`**: node level. Only `nf_conntrack_max`: while the firewall is on,
+  pve-firewall writes the conntrack table size from this file on every compile
+  and overrides `/etc/sysctl.d`.
 
-## Staging only
+## Staged by default, applied by a gated playbook
 
-Output goes to **`build/firewall/`** (gitignored) for review. `firewall_apply`
-defaults to **false**: nothing is written to `/etc/pve/firewall` and nothing is
-applied.
+The default run renders to **`build/firewall/`** (gitignored) for review;
+nothing is written to `/etc/pve/firewall`.
 
 ```bash
 ansible-playbook playbooks/render-firewall.yml
@@ -24,6 +30,25 @@ diff -ru -x README.md roles/proxmox_firewall/files/expected build/firewall
 The committed baselines in `files/expected/` are the reviewed render of the
 example inventory. CI re-renders and diffs against them, so a template or data
 change that alters a rule shows up as a reviewable diff.
+
+The live install is `playbooks/apply-firewall.yml` (`tasks/apply.yml`). It
+refuses a non-check run unless `-e firewall_apply_confirm=apply-live-firewall`
+is passed, so `--check --diff` is the default use. It raises the conntrack
+table first, then writes `host.fw`, `cluster.fw` and each `<vmid>.fw`
+(or only the files named in `firewall_apply_files`). pmxcfs refuses the
+template module's atomic write, so each file is rendered to
+`firewall_stage_dir` on the host, copied in with `cp` and compared with `cmp`.
+Arm `scripts/fw-rollback.sh` on the hypervisor before every live step.
+
+## Coverage against live listeners
+
+`files/listeners/<vmid>.txt` (and `host.txt` for the hypervisor) are captures
+of each guest's listening sockets from `scripts/capture-listeners.sh`, reduced
+to LAN-reachable lines for this public copy. `scripts/tests/check-fw-coverage.py`
+requires every LAN listener to be allowed by the rendered rules, covered by a
+Proxmox built-in, or listed with a reason in `files/listeners/closed.yml`, so a
+firewall flip cannot silently cut a live service. It also fails on any rule
+that names an address the inventory does not know.
 
 ## Rule encoding
 
@@ -39,12 +64,12 @@ Every guest except vault runs `policy_out: ACCEPT`, so their `egress: []` is a
 no-op by design. vault is the one guest with `policy_out: DROP`;
 `always_allow_established` only lets return traffic back in on connections it
 did not open, it does **not** open any new outbound path. A process on vault
-that must dial out (the `tbot` agent from `roles/vault_caddy_tls`, renewing its
-certificate with Teleport) needs a narrow entry keyed on `dest`:
+that must dial out (tailscaled's control and relay sessions, DNS to the LAN
+resolvers, NTP) needs a narrow entry keyed on `dest`:
 
 ```yaml
 egress:
-  - { dest: teleport, port: 3025, proto: tcp, enabled: true, comment: "..." }
+  - { dest: ref:dns_servers, port: 53, proto: udp, enabled: true, comment: "..." }
 ```
 
 That renders to an `OUT ACCEPT -dest <ip> -p <proto> -dport <port>` line, using

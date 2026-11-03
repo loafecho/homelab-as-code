@@ -2,9 +2,10 @@
 # proxmox_firewall — renders Proxmox host nftables rule files from the per-host
 # `firewall` data (host_vars) + the datacenter cluster.fw.
 #
-# Renders to a STAGING dir for review only. Nothing is written to
-# /etc/pve/firewall and nothing is applied. A later, deliberate change flips
-# firewall_apply: true to copy into place on the Proxmox host and reload.
+# The default run (render-firewall.yml, site.yml) renders to a STAGING dir for
+# review only: nothing is written to /etc/pve/firewall. The live install is a
+# separate, gated playbook (playbooks/apply-firewall.yml -> tasks/apply.yml)
+# that refuses to run without an explicit confirm phrase.
 
 # Staging output dir (gitignored). Reviewed by hand before any apply.
 # Anchored to the inventory dir so it resolves to <repo>/build/firewall no matter
@@ -14,5 +15,44 @@ firewall_build_dir: "{{ inventory_dir }}/../build/firewall"
 # Safety switch — keep false until a deliberate, snapshot-backed apply.
 firewall_apply: false
 
-# Live target on the Proxmox host (used only when firewall_apply: true, later).
+# Live target on the Proxmox host (used only by tasks/apply.yml).
 firewall_live_dir: "/etc/pve/firewall"
+
+# Plain-filesystem staging dir on the host. pmxcfs refuses the template
+# module's atomic write, so files are rendered here and cp'd into place.
+firewall_stage_dir: "/root/fw-staged"
+
+# Conntrack table size on the Proxmox host, applied before any .fw file
+# (tasks/apply.yml). 4x the 262,144 default: a 2026-11-01 load test held up
+# to 290k connections. At 256 bytes per entry, a full table is 256 MiB.
+firewall_conntrack_max: 1048576
+
+# Datacenter (cluster.fw) inbound policy for the Proxmox HOST. DROP is the
+# target. The first live step renders this with
+# `-e firewall_cluster_policy_in=ACCEPT` (firewall on, nothing dropped) before
+# any DROP, so the rule set can be watched with the host still fully reachable.
+firewall_cluster_policy_in: DROP
+
+# Members of the datacenter `management` IPSET, and what a host_vars rule with
+# `src: mgmt` expands to: admin_devices + control-zone guests + the OpenTofu
+# deploy box (-> the hypervisor's :8006 API). A port with no known client is
+# opened to this set only.
+firewall_mgmt_sources: >-
+  {{ (admin_devices | map(attribute='ip') | list)
+     + (guests | dict2items | selectattr('value.zone', 'equalto', 'control')
+        | map(attribute='value.ip') | select('string') | list)
+     + [deploy_box.ip] }}
+
+# Hypervisor listeners beyond PVE's built-in management rules (which already
+# admit the IPSET on 22, 8006, 3128 and 5900-5999). Rendered into cluster.fw
+# [RULES]. From live `ss -tulpn` on the hypervisor, 2026-11-01
+# (files/listeners/host.txt).
+firewall_host_rules:
+  - { source: any, proto: udp, port: 41641, comment: "hypervisor tailscaled direct WireGuard" }
+  - { source: "+management", proto: tcp, port: 111, comment: "rpcbind - no known client, management only" }
+  - { source: "+management", proto: udp, port: 111, comment: "rpcbind - no known client, management only" }
+
+# Which files playbooks/apply-firewall.yml writes: ['all'], or a subset such as
+# ['cluster.fw'] (first step: datacenter enable with ACCEPT) or ['115.fw']
+# (a canary guest). Pass as JSON: -e '{"firewall_apply_files": ["cluster.fw"]}'.
+firewall_apply_files: [all]

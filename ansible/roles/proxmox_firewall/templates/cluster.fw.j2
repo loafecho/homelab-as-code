@@ -6,24 +6,29 @@
 # It belongs HERE, not in any <vmid>.fw.
 [OPTIONS]
 enable: 1
-policy_in: DROP
+policy_in: {{ firewall_cluster_policy_in }}
 policy_out: ACCEPT
 
 [IPSET management]
 # PVE's built-in management rules (8006, 22, 5900-5999, 3128) admit this set;
 # without it they fall back to local_network, i.e. the whole LAN. Members are
-# ONLY admin_devices plus the control node (pct_remote and the guest-config
-# comparator SSH to the hypervisor). Never lan_cidr.
+# ONLY admin_devices, the control node (pct_remote and the guest-config
+# comparator SSH to the hypervisor) and the OpenTofu deploy box. Never lan_cidr.
 {% for dev in admin_devices %}
 {{ dev.ip }} # {{ dev.name }}
 {% endfor %}
 {% for gname, g in guests.items() if g.zone == 'control' and g.ip %}
 {{ g.ip }} # {{ gname }} (control node)
 {% endfor %}
+{{ deploy_box.ip }} # {{ deploy_box.name }} (OpenTofu deploy box -> :{{ proxmox_host.mgmt_port }} API)
 
 [RULES]
 # T2 out-of-band: admin_devices -> {{ proxmox_host.name }}:{{ proxmox_host.mgmt_port }} (noVNC console)
 {% for dev in admin_devices %}
 IN ACCEPT -source {{ dev.ip }} -p tcp -dport {{ proxmox_host.mgmt_port }} # T2 noVNC OOB ({{ dev.name }})
+{% endfor %}
+# Host listeners outside PVE's built-in management rules (roles/proxmox_firewall defaults)
+{% for r in firewall_host_rules %}
+IN ACCEPT {{ '' if r.source == 'any' else '-source ' ~ r.source ~ ' ' }}-p {{ r.proto }} -dport {{ r.port }} # {{ r.comment }}
 {% endfor %}
 # NOTE: per-guest east-west rules live in build/firewall/<vmid>.fw, not here.

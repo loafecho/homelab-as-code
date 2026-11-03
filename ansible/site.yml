@@ -5,10 +5,10 @@
 # Order:
 #   1. provision guests        -> roles/proxmox_guest     (idempotent; stubbed bodies)
 #   2. per-host config         -> roles/host_config       (reachability probe + stub)
-#   3. vault Caddy TLS front   -> roles/vault_caddy_tls   (renders to staging; deploy gated off)
-#   4. vault Infisical binding -> roles/vault_infisical   (publishes the API on loopback only)
-#   5. Tailscale admin ACL     -> roles/tailscale_acl     (validate + stage; never pushes)
-#   6. host firewall           -> roles/proxmox_firewall  (renders to staging; apply gated off)
+#   3. vault Infisical binding -> roles/vault_infisical   (publishes the API on loopback only)
+#   4. Tailscale admin ACL     -> roles/tailscale_acl     (validate + stage; never pushes)
+#   5. host firewall           -> roles/proxmox_firewall  (renders to staging; live apply is
+#                                 playbooks/apply-firewall.yml, gated)
 #
 # Risky lifecycle operations (renames, promotions) are NOT here: they belong in
 # their own gated, snapshot-first playbooks. site.yml is the safe, repeatable run.
@@ -17,43 +17,35 @@
 # Dry-run the whole thing:  ansible-playbook site.yml --check --diff
 # ============================================================================
 
-# 1. Provision/converge every Proxmox guest (skips null-vmid hosts: monitor, gateway).
+# 1. Provision/converge every Proxmox guest (skips null-vmid hosts: gateway).
 - name: Provision Proxmox guests
-  hosts: zone_control:zone_secrets:zone_access:zone_home:zone_cluster:zone_dmz
+  hosts: zone_control:zone_secrets:zone_sensitive:zone_access:zone_home:zone_cluster:zone_dmz
   gather_facts: false
   roles:
     - role: proxmox_guest
 
 # 2. Per-host base configuration.
 - name: Per-host configuration
-  hosts: zone_control:zone_secrets:zone_access:zone_home:zone_cluster
+  hosts: zone_control:zone_secrets:zone_sensitive:zone_access:zone_home:zone_cluster
   gather_facts: false
   roles:
     - role: host_config
 
-# 3. Caddy TLS front for vault. STAGED ONLY by default: renders the Caddyfile and
-#    tbot config to build/caddy/; vault_caddy_tls_deploy defaults to false.
-- name: Vault Caddy TLS front (staged; live rollout gated)
-  hosts: vault
-  gather_facts: false
-  roles:
-    - role: vault_caddy_tls
-
-# 4. Infisical on vault answers on loopback only; consumers use tailscale serve.
+# 3. Infisical on vault answers on loopback only; consumers use tailscale serve.
 - name: Vault Infisical binding (loopback only)
   hosts: vault
   gather_facts: false
   roles:
     - role: vault_infisical
 
-# 5. Validate and stage the admin-only Tailscale ACL (run once, from the control node).
+# 4. Validate and stage the admin-only Tailscale ACL (run once, from the control node).
 - name: Validate Tailscale ACL
   hosts: localhost
   gather_facts: false
   roles:
     - role: tailscale_acl
 
-# 6. Render the per-guest + cluster firewall rules (staging only; apply gated off).
+# 5. Render the per-guest + cluster firewall rules (staging only; apply gated off).
 - name: Render Proxmox firewall
   hosts: localhost
   gather_facts: false

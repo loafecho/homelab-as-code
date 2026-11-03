@@ -1,0 +1,11 @@
+# /etc/pve/nodes/{{ proxmox_host.name }}/host.fw  (host level)
+# GENERATED — edit roles/proxmox_firewall/defaults (firewall_conntrack_max), never this file.
+#
+# While the firewall is on, pve-firewall writes nf_conntrack_max from this file
+# on every compile (~10 s), default 262,144, overriding /etc/sysctl.d. Found
+# 2026-11-02 when a live step re-enabled the firewall and the sysctl.d
+# value (1,048,576) dropped back to 262,144.
+
+[OPTIONS]
+
+nf_conntrack_max: {{ firewall_conntrack_max }}

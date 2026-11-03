@@ -1,0 +1,33 @@
+---
+# Apply the Proxmox firewall to the hypervisor's /etc/pve/firewall — GATED.
+#
+# Dry run (safe, read-only; the default use):
+#   ansible-playbook playbooks/apply-firewall.yml --check --diff
+#
+# Live run (operator at the console, after snapshots, a proven break-glass path
+# and scripts/fw-rollback.sh armed on the hypervisor):
+#   ansible-playbook playbooks/apply-firewall.yml --diff \
+#     -e firewall_apply_confirm=apply-live-firewall \
+#     -e firewall_cluster_policy_in=ACCEPT -e '{"firewall_apply_files": ["cluster.fw"]}'
+#
+# Writing cluster.fw with `enable: 1` TURNS THE FIREWALL ON for the host. A
+# guest's <vmid>.fw only filters once that guest's NIC has firewall=1.
+- name: Apply Proxmox firewall (gated; --check --diff is the default use)
+  hosts: hypervisors
+  gather_facts: false
+  vars:
+    firewall_apply_confirm: ""
+  pre_tasks:
+    - name: Refuse a live run without the explicit confirm phrase
+      ansible.builtin.assert:
+        that:
+          - ansible_check_mode or firewall_apply_confirm == 'apply-live-firewall'
+        fail_msg: >-
+          Live firewall apply refused. Dry-run with --check --diff, or pass
+          -e firewall_apply_confirm=apply-live-firewall (operator present).
+        quiet: true
+  tasks:
+    - name: Template firewall files into /etc/pve/firewall
+      ansible.builtin.include_role:
+        name: proxmox_firewall
+        tasks_from: apply

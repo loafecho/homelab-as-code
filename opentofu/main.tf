@@ -99,6 +99,10 @@ resource "proxmox_virtual_environment_container" "worker" {
     bridge = "vmbr0"
     # mac_address is left to the provider: it is read back on import and kept,
     # so no hardware address has to live in git.
+    # The tap goes through the Proxmox firewall bridge. It filters nothing until
+    # /etc/pve/firewall/102.fw exists with enable: 1 and the datacenter firewall
+    # is on (ansible/playbooks/apply-firewall.yml).
+    firewall = var.nic_firewall
   }
 
   initialization {
@@ -128,6 +132,86 @@ resource "proxmox_virtual_environment_container" "worker" {
       pool_id,
       vm_id,
       timeout_start,
+    ]
+  }
+}
+
+# engine, CT 180: a worker container. First job: SearXNG, the web search an
+# agent gateway on the control node calls; more jobs later. Created here,
+# configured inside by Ansible. Off only in scripts/smoke/fleet-smoke.sh
+# (TF_VAR_engine=false), which rehearses the worker import and nothing else.
+resource "proxmox_virtual_environment_container" "engine" {
+  count = var.engine ? 1 : 0
+
+  node_name = var.node_name
+  vm_id     = 180
+  # The tofu token is scoped to the pool only.
+  pool_id     = var.pool_id
+  description = "engine - worker container (SearXNG first). Managed by OpenTofu; configured inside by Ansible."
+  # No `tags`: a pool-scoped token gets 403 on tag edits (see pilot above).
+  unprivileged  = true
+  start_on_boot = true
+  started       = true
+
+  operating_system {
+    template_file_id = "local:vztmpl/debian-12-standard_12.12-1_amd64.tar.zst"
+    type             = "debian"
+  }
+
+  cpu {
+    cores = 2
+  }
+
+  memory {
+    dedicated = 4096
+    swap      = 512
+  }
+
+  disk {
+    datastore_id = "local-lvm"
+    size         = 32
+  }
+
+  network_interface {
+    name   = "eth0"
+    bridge = "vmbr0"
+    # Filtered by roles/proxmox_firewall's 180.fw once the datacenter
+    # firewall is on (ansible/playbooks/apply-firewall.yml).
+    firewall = var.nic_firewall
+  }
+
+  initialization {
+    hostname = "engine"
+
+    dns {
+      domain  = "lan"
+      servers = [var.dns_server]
+    }
+
+    # Static, outside the router's DHCP pool.
+    ip_config {
+      ipv4 {
+        address = "192.0.2.61/24"
+        gateway = "192.0.2.1"
+      }
+    }
+
+    # The control node's Ansible key for this guest only.
+    user_account {
+      keys = var.engine_ssh_keys
+    }
+  }
+
+  # Docker inside an unprivileged CT needs nesting.
+  features {
+    nesting = true
+  }
+
+  lifecycle {
+    prevent_destroy = true
+    ignore_changes = [
+      operating_system[0].template_file_id,
+      initialization[0].user_account,
     ]
   }
 }

@@ -1,0 +1,75 @@
+---
+# proxmox_firewall — LIVE apply: render cluster.fw + <vmid>.fw and install them
+# into /etc/pve/firewall on the Proxmox host. Reached ONLY via
+# playbooks/apply-firewall.yml, which refuses a non-check run without
+# firewall_apply_confirm=apply-live-firewall.
+#
+# pmxcfs (/etc/pve) refuses the temp-file rename and chmod that the template
+# module's atomic write needs ("Operation not permitted"), and unsafe_writes
+# still fails after the content lands (found on the first live run,
+# 2026-11-01). So each file is rendered to a plain directory on the host and
+# installed with `cp`, which pmxcfs accepts. The diff against the live file is
+# still the template module's own (check_mode: true), so `--check --diff` shows
+# exactly what a live run would change. pve-firewall re-reads these files on
+# its own (~10 s); nothing is restarted here.
+
+# Conntrack headroom comes first, before any .fw file can turn the firewall on.
+# Enabling it sets bridge-nf-call-iptables=1, so every bridged guest<->guest
+# connection takes a conntrack slot; on 2026-11-01 a 290k-connection load test
+# filled the 262,144 default and the hypervisor dropped new packets for every guest.
+# The module is loaded early so the sysctl exists when systemd-sysctl runs at boot.
+- name: Load nf_conntrack at boot (so its sysctl applies before the firewall starts)
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/nf_conntrack.conf
+    content: "nf_conntrack\n"
+    mode: "0644"
+
+- name: Conntrack table size (firewall_conntrack_max)
+  ansible.builtin.copy:
+    dest: /etc/sysctl.d/90-pve-firewall-conntrack.conf
+    content: |
+      # Managed by homelab-as-code roles/proxmox_firewall.
+      net.netfilter.nf_conntrack_max = {{ firewall_conntrack_max }}
+    mode: "0644"
+  register: fw_conntrack_conf
+
+- name: Apply the conntrack table size now
+  ansible.builtin.command: sysctl -p /etc/sysctl.d/90-pve-firewall-conntrack.conf
+  when: fw_conntrack_conf.changed
+  changed_when: true
+
+- name: Staging directory on the host (plain filesystem, not pmxcfs)
+  ansible.builtin.file:
+    path: "{{ firewall_stage_dir }}"
+    state: directory
+    mode: "0700"
+
+# pve-firewall overwrites nf_conntrack_max from host.fw on every compile while
+# the firewall is on, so the size must live here too, before cluster.fw.
+- name: Apply host.fw (nf_conntrack_max while the firewall is on)
+  ansible.builtin.include_tasks: apply_one.yml
+  vars:
+    fw_src: host.fw.j2
+    fw_file: host.fw
+    fw_dir: "/etc/pve/nodes/{{ proxmox_host.name }}"
+  when: "'host.fw' in firewall_apply_files or 'all' in firewall_apply_files"
+
+- name: Apply datacenter cluster.fw
+  ansible.builtin.include_tasks: apply_one.yml
+  vars:
+    fw_src: cluster.fw.j2
+    fw_file: cluster.fw
+  when: "'cluster.fw' in firewall_apply_files or 'all' in firewall_apply_files"
+
+- name: Apply per-guest <vmid>.fw (skips null-vmid guests)
+  ansible.builtin.include_tasks: apply_one.yml
+  vars:
+    fw_src: guest.fw.j2
+    fw_file: "{{ guests[item].vmid }}.fw"
+    fw_guest: "{{ item }}"
+  loop: "{{ guests.keys() | list }}"
+  loop_control:
+    label: "{{ item }} -> {{ guests[item].vmid | default('SKIP(no-vmid)') }}.fw"
+  when:
+    - guests[item].vmid not in [None, omit]
+    - ((guests[item].vmid | string) ~ '.fw') in firewall_apply_files or 'all' in firewall_apply_files

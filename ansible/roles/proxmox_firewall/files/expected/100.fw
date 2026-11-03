@@ -9,4 +9,13 @@ policy_out: ACCEPT
 [RULES]
 IN ACCEPT -source 192.0.2.50 -p tcp -dport 22 # T1 break-glass SSH
 IN ACCEPT -source 192.0.2.51 -p tcp -dport 22 # T1 break-glass SSH
-IN ACCEPT -source 192.0.2.190 -p tcp -dport 443 # monitor canary probe (the one tag:monitor grant)
+IN ACCEPT -source 192.0.2.130 -p tcp -dport 8787 # webhook receiver - the workflow engine on kube POSTs to control:8787
+IN ACCEPT -source 192.0.2.50 -p tcp -dport 12865 # netserver (netperf) - no known client, management only
+IN ACCEPT -source 192.0.2.51 -p tcp -dport 12865 # netserver (netperf) - no known client, management only
+IN ACCEPT -source 192.0.2.100 -p tcp -dport 12865 # netserver (netperf) - no known client, management only
+IN ACCEPT -source 192.0.2.190 -p tcp -dport 12865 # netserver (netperf) - no known client, management only
+IN ACCEPT -source 192.0.2.50 -p udp -dport 2112 # irtt server - no known client, management only
+IN ACCEPT -source 192.0.2.51 -p udp -dport 2112 # irtt server - no known client, management only
+IN ACCEPT -source 192.0.2.100 -p udp -dport 2112 # irtt server - no known client, management only
+IN ACCEPT -source 192.0.2.190 -p udp -dport 2112 # irtt server - no known client, management only
+IN ACCEPT -p udp -dport 41641 # tailscaled direct WireGuard (peers authenticate with node keys; DERP fallback rides established)

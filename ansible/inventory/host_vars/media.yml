@@ -10,17 +10,42 @@ firewall:
     - { src: control, port: 22, proto: tcp, enabled: true, comment: "Ansible control" }
     - { src: gateway, port: 8096, proto: tcp, enabled: false,
         comment: "media server via the DMZ gateway. ENABLE when gateway is built" }
+    # Rules below come from live `ss -tulnp` (2026-11-01, captured in
+    # roles/proxmox_firewall/files/listeners/<vmid>.txt). A port with no known
+    # client is opened to the management set (`src: mgmt`) only.
+    # The TVs that play from the media server are not on the tailnet, so the
+    # media ports are open to the whole LAN (its Devices table shows two TVs
+    # playing daily).
+    - { src: lan, port: 8096, proto: tcp, enabled: true,
+        comment: "Jellyfin - LAN TVs play over the LAN (Devices table, 2026-11-01)" }
+    - { src: lan, port: 7359, proto: udp, enabled: true, comment: "Jellyfin client discovery - LAN TVs" }
+    - { src: lan, port: 18555, proto: tcp, enabled: true,
+        comment: "go2rtc WebRTC (Home Assistant cameras) - phones on Wi-Fi may connect direct; no evidence either way, kept LAN as today" }
+    - { src: mgmt, port: 8482, proto: tcp, enabled: true, comment: "home-assistant-matter-hub web UI - no known LAN client, management only" }
+    - { src: any, port: 5540, proto: udp, enabled: true,
+        comment: "FLAG: Matter bridge (matter-hub) - LAN Matter controllers dial in; kept open (IPv4 + IPv6 link-local, as today)" }
+    - { src: any, port: 46967, proto: tcp, enabled: true,
+        comment: "FLAG: unknown - python-matter-server listener; kept open (IPv4 + IPv6 link-local, as today)" }
+    - { src: any, port: 46967, proto: udp, enabled: true,
+        comment: "FLAG: unknown - python-matter-server listener; kept open (IPv4 + IPv6 link-local, as today)" }
+    - { src: any, port: 5353, proto: udp, enabled: true,
+        comment: "FLAG: mDNS - Home Assistant / Matter device discovery; kept open (IPv4 + IPv6 link-local, as today)" }
+    - { src: any, port: 1900, proto: udp, enabled: true,
+        comment: "FLAG: SSDP - Home Assistant device discovery; kept open (IPv4 + IPv6 link-local, as today)" }
+    - { src: internet, port: 41641, proto: udp, enabled: true,
+        comment: "tailscaled direct WireGuard (peers authenticate with node keys; DERP fallback rides established)" }
   egress: []
-  # Carve-out: media stays a secret_consumer (vault:443 via policy_out ACCEPT).
-  # Accepted risk: media will be public-fronted through the gateway, so a
-  # compromised media guest can reach vault:443 (TLS, auth still required).
+  # Carve-out: media stays a secret_consumer (vault's tailnet :443 via
+  # policy_out ACCEPT). Accepted risk: media will be public-fronted through the
+  # gateway, so a compromised media guest can reach vault:443 (TLS, auth still
+  # required).
 
 # --- Declared hardware ---
 guest_cores: 4
 guest_memory: 8192
 guest_balloon: 8192
 guest_disk_gb: 64
-guest_net0: "virtio,bridge=vmbr0"
+guest_net0: "virtio,bridge=vmbr0,firewall=1"
 guest_onboot: true
 guest_startup: "order=3"
 guest_machine: "q35"

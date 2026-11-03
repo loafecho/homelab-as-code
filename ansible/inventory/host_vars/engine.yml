@@ -1,0 +1,28 @@
+---
+# engine (CT 180) - worker container. First job: SearXNG for an agent gateway
+# on the control node. Created by OpenTofu (opentofu/main.tf); configured
+# inside by its own role (not part of this copy).
+#
+# Two firewalls, two layers:
+#   - `firewall` below is the PROXMOX TAP model (rendered to build/firewall/180.fw
+#     by roles/proxmox_firewall, like every other guest).
+#   - nftables INSIDE the container, written from the same facts: :22 from the
+#     LAN, :8888 from the control node only.
+zone: worker
+firewall:
+  policy_in: DROP
+  policy_out: ACCEPT       # SearXNG fans out to public search engines over HTTPS
+  always_allow_established: true
+  ingress:
+    - { src: ref:admin_devices, port: 22, proto: tcp, enabled: true, comment: "T1 break-glass SSH" }
+    - { src: control, port: 22, proto: tcp, enabled: true, comment: "Ansible control" }
+    - { src: control, port: 8888, proto: tcp, enabled: true, comment: "SearXNG - the agent gateway on control is the only caller" }
+  egress: []
+
+# --- Declared hardware (transcribed from opentofu/main.tf, CT 180) ---
+# net0 is NOT declared: Proxmox assigns its MAC at create time and OpenTofu
+# owns the interface; a hand-copied string here would only drift.
+guest_cores: 2
+guest_memory: 4096
+guest_disk_gb: 32
+guest_onboot: true

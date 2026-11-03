@@ -35,14 +35,16 @@ tasks:
       - for pb in playbooks/*.yml; do ansible-playbook "$pb" --syntax-check; done
 
   renders:
-    desc: Render firewall, Caddy and ACL from the inventory and diff against the baselines.
+    desc: Render firewall and ACL from the inventory and diff against the baselines.
     cmds:
       - ./scripts/check-renders.sh
 
   test:
-    desc: Offline tests (comparator, Argo tree, OpenTofu smoke + controls).
+    desc: Offline tests (comparator, firewall coverage, fw-rollback, Argo tree, OpenTofu smoke + controls).
     cmds:
       - ./scripts/tests/test-check-guest-config.sh
+      - python3 scripts/tests/check-fw-coverage.py
+      - bash scripts/tests/test-fw-rollback.sh
       - python3 scripts/tests/check-argo-apps.py
       - bash opentofu/scripts/smoke/fleet-smoke.sh
       - bash opentofu/scripts/smoke/fleet-smoke-controls.sh

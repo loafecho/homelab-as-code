@@ -1,0 +1,14 @@
+# listeners: hypervisor (Proxmox host) (vmid host) — captured 2026-11-01T21:49Z by scripts/capture-listeners.sh
+# published copy: LAN-reachable lines only (loopback, tailnet and link-local
+# sockets removed); LAN addresses mapped to the example 192.0.2.x scheme
+# <proto> <bind-address> <port> <process>
+tcp * 3128 spiceproxy_work
+tcp * 8006 pveproxy_worker
+tcp 0.0.0.0 111 rpcbind
+tcp 0.0.0.0 22 sshd
+tcp :: 111 rpcbind
+tcp :: 22 sshd
+udp 0.0.0.0 111 rpcbind
+udp 0.0.0.0 41641 tailscaled
+udp :: 111 rpcbind
+udp :: 41641 tailscaled

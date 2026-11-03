@@ -4,16 +4,19 @@
 # hypervisor, no tailnet, no credentials.
 #
 #   build/firewall             vs ansible/roles/proxmox_firewall/files/expected/
-#   build/caddy                vs ansible/roles/vault_caddy_tls/files/expected/
 #   build/tailscale/acl.hujson vs ansible/roles/tailscale_acl/files/acl.hujson
-#   build/firewall/cluster.fw  [IPSET management] == admin_devices + control
+#   build/firewall/cluster.fw  [IPSET management] == admin_devices + control + deploy box
 #
-# Exit 0 = renders match, 1 = a render differs (the diff is printed),
-# 2 = a render playbook failed.
+# Every roles/*/files/expected/ baseline directory must be diffed below: one
+# that exists but is not checked fails the run, so a render check cannot be
+# dropped while its baseline stays behind.
+#
+# Exit 0 = renders match, 1 = a render differs (the diff is printed) or a
+# baseline directory is unchecked, 2 = a render playbook failed.
 set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/../ansible" || exit 2
 
-for pb in playbooks/render-firewall.yml playbooks/validate-tailscale-acl.yml playbooks/render-caddy.yml; do
+for pb in playbooks/render-firewall.yml playbooks/validate-tailscale-acl.yml; do
   if ! out=$(ansible-playbook "$pb" 2>&1); then
     echo "check-renders: render playbook FAILED: $pb"
     echo "$out" | tail -20
@@ -22,14 +25,22 @@ for pb in playbooks/render-firewall.yml playbooks/validate-tailscale-acl.yml pla
 done
 
 rc=0
+checked=(roles/proxmox_firewall/files/expected)
 diff -ru -x README.md roles/proxmox_firewall/files/expected build/firewall || rc=1
-diff -ru -x README.md roles/vault_caddy_tls/files/expected build/caddy || rc=1
+for d in roles/*/files/expected; do
+  [ -d "$d" ] || continue
+  if ! printf '%s\n' "${checked[@]}" | grep -qxF -- "$d"; then
+    echo "check-renders: baseline directory $d is not diffed by this script"
+    rc=1
+  fi
+done
 diff -u roles/tailscale_acl/files/acl.hujson build/tailscale/acl.hujson || rc=1
 # The rendered cluster.fw must pin PVE's management IPSET to admin_devices +
-# control; without it the built-in management rules fall back to the whole LAN.
+# control + the deploy box; without it the built-in management rules fall back
+# to the whole LAN.
 python3 ../scripts/tests/check-mgmt-ipset.py build/firewall/cluster.fw || rc=1
 if [ "$rc" -eq 0 ]; then
-  echo "check-renders: OK (firewall, caddy, tailscale ACL match their baselines; management IPSET pinned)"
+  echo "check-renders: OK (firewall and tailscale ACL match their baselines; every baseline dir checked; management IPSET pinned)"
 else
   echo "check-renders: DRIFT (see diff above; re-review and update the baseline if intended)"
 fi

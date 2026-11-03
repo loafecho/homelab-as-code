@@ -10,9 +10,13 @@ firewall:
   ingress:
     - { src: ref:admin_devices, port: 22, proto: tcp, enabled: true, comment: "T1 break-glass SSH" }
     - { src: control, port: 22, proto: tcp, enabled: true, comment: "Ansible control" }
-    - { src: "group:secret_consumers", port: 443, proto: tcp, enabled: true,
-        comment: "secret fetch via the Caddy TLS front (roles/vault_caddy_tls)" }
-    - { src: monitor, port: 443, proto: tcp, enabled: true, comment: "uptime probe" }
+    # No LAN :443 rule: nothing listens on vault's LAN :443 or :80. Consumers
+    # fetch secrets over the tailnet (`tailscale serve` on vault's tailnet
+    # address -> Infisical on loopback), which arrives inside WireGuard on UDP
+    # 41641 below, never on a LAN tap port. (The staged Caddy TLS front that
+    # the old LAN :443 rule waited for was retired unused.)
+    - { src: ref:monitoring_sources, port: 9100, proto: tcp, enabled: true,
+        comment: "node_exporter scrape (telemetry CT 103 scrapes vault:9100)" }
     # Direct WireGuard paths for tailscaled. WireGuard authenticates every
     # packet with the peer's node key; without this rule peers fall back to DERP.
     - { src: internet, port: 41641, proto: udp, enabled: true,
@@ -24,24 +28,28 @@ firewall:
   # coordination server and DERP relays (TCP 443) and STUN (UDP 3478), or
   # applying policy_out: DROP cuts the ESO path. Destinations are "internet"
   # because those addresses are provider-operated and change.
-  # (2) tbot (Teleport Machine ID,
-  # roles/vault_caddy_tls) runs on vault and must dial OUT to Teleport to join
-  # and renew the Caddy TLS leaf cert. always_allow_established only covers
-  # return traffic, not a new outbound session, so this rule is required.
+  # (2) DNS + NTP. tailscaled resolves its control and relay hosts through the
+  # LAN resolvers before MagicDNS is up, and chrony resolves and polls
+  # pool.ntp.org. Both are new outbound sessions, so established/related does
+  # not cover them.
   egress:
     - { dest: internet, port: 443, proto: tcp, enabled: true,
         comment: "tailscaled -> coordination server + DERP relays (tailnet endpoint for ESO)" }
     - { dest: internet, port: 3478, proto: udp, enabled: true,
         comment: "tailscaled -> STUN (NAT discovery for direct WireGuard paths)" }
-    - { dest: teleport, port: 3025, proto: tcp, enabled: true,
-        comment: "tbot -> Teleport auth for Caddy TLS cert renewal. Cert plumbing only, never in the secret-fetch path" }
-  # CUT: the DMZ must NEVER reach vault. Only group:secret_consumers is admitted.
+    - { dest: ref:dns_servers, port: 53, proto: udp, enabled: true,
+        comment: "DNS to the LAN resolvers (tailscaled bootstrap, chrony pool lookup)" }
+    - { dest: ref:dns_servers, port: 53, proto: tcp, enabled: true,
+        comment: "DNS over TCP (truncated answers)" }
+    - { dest: internet, port: 123, proto: udp, enabled: true,
+        comment: "chrony -> pool.ntp.org" }
+  # CUT: the DMZ must NEVER reach vault, and no LAN port carries secret fetches.
 
 # --- Declared hardware ---
 guest_cores: 2
 guest_memory: 3072
 guest_balloon: 1792
 guest_disk_gb: 16
-guest_net0: "virtio,bridge=vmbr0"
+guest_net0: "virtio,bridge=vmbr0,firewall=1"
 guest_onboot: true
 guest_startup: "order=1,up=30"

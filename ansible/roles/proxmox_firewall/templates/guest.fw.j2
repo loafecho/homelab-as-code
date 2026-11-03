@@ -3,8 +3,12 @@
 {%- set fw = hostvars[fw_guest].firewall -%}
 {%- set lines = [] -%}
 {%- for rule in fw.ingress -%}
-{%-   if rule.src == 'internet' -%}
+{%-   if rule.src in ['internet', 'any'] -%}
 {%-     set srcs = ['any'] -%}
+{%-   elif rule.src == 'lan' -%}
+{%-     set srcs = [lan_cidr] -%}
+{%-   elif rule.src == 'mgmt' -%}
+{%-     set srcs = firewall_mgmt_sources -%}
 {%-   elif rule.src.startswith('group:') -%}
 {%-     set srcs = lookup('vars', rule.src.split(':')[1]) | map('extract', guests, 'ip') | select('string') | list -%}
 {%-   elif rule.src.startswith('ref:') -%}
@@ -29,8 +33,12 @@
 {#- sessions, so those need an explicit OUT ACCEPT rule, mirroring the -#}
 {#- ingress src-resolution above but keyed on `dest`. -#}
 {%- for rule in fw.egress | default([]) -%}
-{%-   if rule.dest == 'internet' -%}
+{%-   if rule.dest in ['internet', 'any'] -%}
 {%-     set dsts = ['any'] -%}
+{%-   elif rule.dest == 'lan' -%}
+{%-     set dsts = [lan_cidr] -%}
+{%-   elif rule.dest == 'mgmt' -%}
+{%-     set dsts = firewall_mgmt_sources -%}
 {%-   elif rule.dest.startswith('group:') -%}
 {%-     set dsts = lookup('vars', rule.dest.split(':')[1]) | map('extract', guests, 'ip') | select('string') | list -%}
 {%-   elif rule.dest.startswith('ref:') -%}

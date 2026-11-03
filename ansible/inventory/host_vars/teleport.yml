@@ -9,12 +9,20 @@ firewall:
   ingress:
     - { src: ref:admin_devices, port: 22, proto: tcp, enabled: true, comment: "T1 break-glass SSH" }
     - { src: control, port: 22, proto: tcp, enabled: true, comment: "Ansible control" }
-    - { src: vault, port: 3025, proto: tcp, enabled: true, comment: "tbot on vault joins + renews its cert" }
+    # Rules below come from live `ss -tulnp` (2026-11-01, captured in
+    # roles/proxmox_firewall/files/listeners/<vmid>.txt). A port with no known
+    # client is opened to the management set (`src: mgmt`) only.
+    - { src: mgmt, port: 443, proto: tcp, enabled: true,
+        comment: "Teleport proxy - live clients arrive over the tailnet only; LAN management only" }
+    - { src: mgmt, port: 3025, proto: tcp, enabled: true,
+        comment: "Teleport auth - only local clients seen (vault's cert agent retired); management only" }
+    - { src: internet, port: 41641, proto: udp, enabled: true,
+        comment: "tailscaled direct WireGuard (peers authenticate with node keys; DERP fallback rides established)" }
   egress: []
 
 # --- Declared hardware (LXC: net0 is compared with the MAC stripped) ---
 guest_cores: 2
 guest_memory: 2048
 guest_disk_gb: 8
-guest_net0: "name=eth0,bridge=vmbr0,ip=dhcp,type=veth"
+guest_net0: "name=eth0,bridge=vmbr0,firewall=1,ip=dhcp,type=veth"
 guest_onboot: true

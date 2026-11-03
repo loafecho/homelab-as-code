@@ -7,7 +7,15 @@ firewall:
   always_allow_established: true
   ingress:
     - { src: ref:admin_devices, port: 22, proto: tcp, enabled: true, comment: "T1 break-glass SSH" }
-    - { src: monitor, port: 443, proto: tcp, enabled: true, comment: "monitor canary probe (the one tag:monitor grant)" }
+    # Rules below come from live `ss -tulnp` (2026-11-01, captured in
+    # roles/proxmox_firewall/files/listeners/<vmid>.txt). A port with no known
+    # client is opened to the management set (`src: mgmt`) only.
+    - { src: kube, port: 8787, proto: tcp, enabled: true,
+        comment: "webhook receiver - the workflow engine on kube POSTs to control:8787" }
+    - { src: mgmt, port: 12865, proto: tcp, enabled: true, comment: "netserver (netperf) - no known client, management only" }
+    - { src: mgmt, port: 2112, proto: udp, enabled: true, comment: "irtt server - no known client, management only" }
+    - { src: internet, port: 41641, proto: udp, enabled: true,
+        comment: "tailscaled direct WireGuard (peers authenticate with node keys; DERP fallback rides established)" }
   egress: []
   # control is the SOURCE of the "control -> all guests:22" Ansible rule. With
   # policy_out: ACCEPT that egress needs no explicit entry here; the matching

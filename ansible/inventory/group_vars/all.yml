@@ -24,6 +24,25 @@ admin_devices:
   - { name: admin-laptop, ip: "192.0.2.50" }
   - { name: admin-workstation, ip: "192.0.2.51" }
 
+# OpenTofu deploy box: a Raspberry Pi that holds the hardware key and runs
+# `tofu apply` against the Proxmox API on the hypervisor's :8006, so it joins
+# the datacenter `management` IPSET. It gets NO guest SSH or break-glass
+# reach; that stays admin_devices only. (The same Pi used to be the uptime
+# monitor; it was reflashed for this job and the monitor role is retired.)
+deploy_box: { name: deploy-box, ip: "192.0.2.190" }
+
+# Hosts that are not modeled guests but are known clients of guest ports.
+# telemetry (CT 103) scrapes vault's node_exporter on :9100.
+monitoring_sources:
+  - { name: telemetry, vmid: 103, ip: "192.0.2.129" }
+
+# LAN resolvers a DROP-egress guest (vault) must still reach: tailscaled
+# resolves its control and relay hosts before MagicDNS is up, and chrony
+# resolves pool.ntp.org.
+dns_servers:
+  - { name: adguard, ip: "192.0.2.53" }
+  - { name: router, ip: "192.0.2.1" }
+
 # Canonical guest map: vmid + zone + reserved IP + egress policy.
 guests:
   control: { vmid: 100, ip: "192.0.2.100", zone: control, egress_policy: accept }
@@ -31,8 +50,9 @@ guests:
   media: { vmid: 112, ip: "192.0.2.112", zone: home, egress_policy: accept }
   teleport: { vmid: 115, ip: "192.0.2.115", zone: access, egress_policy: accept }
   kube: { vmid: 130, ip: "192.0.2.130", zone: cluster, egress_policy: accept }
-  # monitor: RPi, NOT a Proxmox guest. Enforced at the Tailscale ACL + ufw.
-  monitor: { vmid: ~, ip: "192.0.2.190", zone: monitor, egress_policy: accept }
+  # engine: a worker container OpenTofu creates (opentofu/main.tf, CT 180).
+  engine: { vmid: 180, ip: "192.0.2.61", zone: worker, egress_policy: accept }
+  email: { vmid: 901, ip: "192.0.2.174", zone: sensitive, egress_policy: accept }
   # gateway: DMZ reverse proxy, NOT BUILT. Assign IP + reservation when provisioned.
   gateway: { vmid: ~, ip: ~, zone: dmz, egress_policy: accept }
 
@@ -41,19 +61,25 @@ zones:
   control: "control: orchestrator, SSH to every guest (Ansible)"
   secrets: "vault: Infisical secrets sink; egress DROP; never reached from the DMZ"
   access: "teleport: audited access plane for outside integrations"
+  sensitive: "email: the mail server; business, legal and financial data"
   home: "media: household services"
   dmz: "gateway: public traffic terminates here (not built yet)"
-  monitor: "monitor (Pi): untrusted; probes the break-glass paths"
   cluster: "kube: Kubernetes node; internal segmentation is Cilium NetworkPolicy per namespace"
+  # Job runners, not data holders: no secrets-zone reach (not in
+  # secret_consumers), and only the control node calls in.
+  worker: "engine: worker containers for jobs (a SearXNG search service first)"
 
 # Hosts allowed to fetch secrets from vault (all resolve to the vault:443 target).
 # The home zone is a deliberate, documented carve-out: media fetches its own
 # app credentials. The DMZ must never appear here.
-secret_consumers: [control, teleport, media]
+secret_consumers: [control, email, teleport, media]
 
 vault_endpoint:
   ip: "192.0.2.101"
-  port: 443                           # served by roles/vault_caddy_tls once deployed
+  port: 443
+  # Consumers reach Infisical ONLY over the tailnet: `tailscale serve` on
+  # vault's tailnet address :443 -> 127.0.0.1:80 (roles/vault_infisical
+  # publishes it on loopback). Nothing listens on vault's LAN :443 or :80.
 
 # Live vmids deliberately NOT managed by this repo. scripts/check-guest-config.sh
 # fails on any live vmid absent from BOTH the inventory and this allowlist, so

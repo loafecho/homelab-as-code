@@ -93,7 +93,7 @@ declared = {}   # name -> hv
 for name, hv in hostvars.items():
     vmid = hv.get("guest_vmid")
     if vmid in (None, "", "None"):
-        continue                      # monitor (RPi), gateway (not built), localhost
+        continue                      # gateway (not built), localhost, the hypervisor
     declared[name] = hv
 
 unmanaged = []

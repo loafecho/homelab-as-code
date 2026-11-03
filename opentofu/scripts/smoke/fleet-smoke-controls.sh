@@ -4,7 +4,7 @@
 # (unchanged) fleet-smoke.sh, and must see it exit non-zero with the expected
 # SMOKE FAIL line(s). A mutation that doesn't apply counts as not caught.
 #
-#   bash scripts/smoke/fleet-smoke-controls.sh   # PASS = "CONTROLS: 9 of 9 caught"
+#   bash scripts/smoke/fleet-smoke-controls.sh   # PASS = "CONTROLS: 11 of 11 caught"
 # shellcheck disable=SC2016  # the $VARs in the mutations are meant literally
 set -uo pipefail
 REPO=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
@@ -72,6 +72,14 @@ control replay-gap scripts/smoke/replay/worker.json \
 control ca-not-pinned scripts/fleet \
   'SSL_CERT_FILE=$(readlink -f -- "$pve_ca")' 'SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt' \
   "B first plan is not import-only"
+
+# N: the default config must match the recorded hypervisor (NIC firewall flag on), and nothing else may drift.
+control nic-firewall-off variables.tf \
+  $'network interfaces"\n  type        = bool\n  default     = true' $'network interfaces"\n  type        = bool\n  default     = false' \
+  "N default plan is not 'No changes.'"
+control nic-firewall-plus-mtu main.tf \
+  '    firewall = var.nic_firewall' $'    firewall = var.nic_firewall\n    mtu      = 1400' \
+  "N default plan is not 'No changes.'"
 
 echo "CONTROLS: $caught of $total caught"
 [ "$caught" -eq "$total" ]
